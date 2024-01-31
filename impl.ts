@@ -2,7 +2,7 @@ import { createServer, Plugin } from "npm:vite@5.0.11";
 import { relative, dirname, join, basename } from "https://deno.land/std@0.213.0/path/mod.ts";
 import { exists } from "https://deno.land/std@0.213.0/fs/exists.ts";
 
-type PreviOption = {
+type PrevisOption = {
   cwd: string;
   previewTargetPath: string;
   port: number;
@@ -70,7 +70,7 @@ function buildVirtualIndexHtml(width: string, height: string) {
 `;
 }
 
-export async function startPrevis(options: PreviOption) {
+export async function startPrevis(options: PrevisOption) {
   const previewType = detectPreviewType(options.previewTargetPath);
   const viteSettings: ViteSettings = options.ignore ? {
     isViteProject: false,
@@ -161,7 +161,7 @@ new Target({
 }
 
 const log = (...args: Array<unknown>) => {
-  console.log("[previ]", ...args);
+  console.log("[previs]", ...args);
 }
 
 // find vite.config.ts from current dir to root
