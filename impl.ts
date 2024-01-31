@@ -15,7 +15,7 @@ type PrevisOption = {
 };
 
 const ENTRY_FILE_NAME = "entry.preview.tsx";
-const VIRTUAL_ROOT_DIR = ".preview";
+const VIRTUAL_ROOT_DIR = ".previs";
 const TARGET_MARKER = "__TARGET__";
 
 export enum PreviewType {
@@ -263,10 +263,53 @@ export async function initializePreviewProject({
   async function ensureFile(filepath: string, content: string) {
     if (forceRewrite || !await exists(filepath)) {
       await Deno.writeTextFile(filepath, content);
-      log(`created ${filepath}`);
+      // log(`created ${filepath}`);
     }
   }
 }
+
+export async function initializeVolatileProject({
+  width,
+  height,
+  dir,
+  stylePath,
+  forceRewrite,
+  previewType
+}: InitVitePreviewProjectOption) {
+  const tmpHash = Math.random().toString(36).slice(2);
+  const previewDir = join(dir, VIRTUAL_ROOT_DIR + "-" + tmpHash);
+  await Deno.mkdir(previewDir, { recursive: true }).catch(() => { });
+
+  await ensureFile(join(previewDir, 'index.html'), buildVirtualIndexHtml(width, height));
+
+  // generate entry file
+  const styleRelativePath = stylePath ? relative(previewDir, stylePath) : undefined;
+  if (previewType === PreviewType.React) {
+    const filename = basename(stylePath ?? "").split(".")[0];
+    await ensureFile(join(previewDir, ENTRY_FILE_NAME), buildReactEntry(filename, styleRelativePath));
+  }
+  else if (previewType === PreviewType.Svelte) {
+    await ensureFile(join(previewDir, ENTRY_FILE_NAME), buildSvelteEntry(styleRelativePath));
+  } else {
+    throw new Error("not implemented");
+  }
+
+  // generate vite.config.mts
+  await ensureFile(join(previewDir, 'vite.config.mts'), buildVanillaViteConfig());
+  return {
+    previewDir,
+    cleanup: () => {
+      Deno.removeSync(previewDir, { recursive: true });
+    }
+  }
+  async function ensureFile(filepath: string, content: string) {
+    if (forceRewrite || !await exists(filepath)) {
+      await Deno.writeTextFile(filepath, content);
+      // log(`created ${filepath}`);
+    }
+  }
+}
+
 
 function virtualPreview(previewRoot: string, previewTargetPath: string) {
   return {

@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 import { join } from "https://deno.land/std@0.213.0/path/mod.ts";
-import { startPrevis, initializePreviewProject, findConfigDirectory, detectPreviewType } from "./impl.ts";
+import { startPrevis, initializeVolatileProject, findConfigDirectory, detectPreviewType } from "./impl.ts";
 
 // TODO: separte init and run options
 const options = parseArgs({
@@ -56,7 +56,7 @@ if (cmdOrTarget === "init") {
   const previewType = detectPreviewType(config.configPath!);
   const stylePath = options.values.style ? join(Deno.cwd(), options.values.style) : undefined;
 
-  await initializePreviewProject({
+  await initializeVolatileProject({
     width: options.values.width!,
     height: options.values.height!,
     isViteProject: true,
