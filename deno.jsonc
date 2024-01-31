@@ -1,15 +1,17 @@
 {
   "compilerOptions": {
     "lib": [
+      "esnext",
       "deno.window",
       "deno.ns",
       "deno.fetch",
       "dom",
-      "dom.iterable",
-      "esnext",
-      "allow"
+      "dom.iterable"
     ],
     "jsx": "react-jsx",
     "jsxImportSource": "react"
+  },
+  "tasks": {
+    "test": "deno test -A test.ts"
   }
 }

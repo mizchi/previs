@@ -1,6 +1,5 @@
-import { parseArgs } from "node:util";
-import { join } from "https://deno.land/std@0.213.0/path/mod.ts";
-import { startPrevis, initializeVolatileProject, findConfigDirectory, detectPreviewType } from "./impl.ts";
+import { join, parseArgs } from "./deps.ts";
+import { startPrevis, initializeVolatileProject, findConfigDirectory, detectPreviewType } from "./builder.ts";
 
 // TODO: separte init and run options
 const options = parseArgs({
@@ -93,5 +92,4 @@ if (cmdOrTarget === "init") {
     viteBuilder.close();
     Deno.exit(0);
   });
-
 }

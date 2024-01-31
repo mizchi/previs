@@ -1,6 +1,4 @@
-import { createServer, Plugin } from "npm:vite@5.0.11";
-import { relative, dirname, join, basename } from "https://deno.land/std@0.213.0/path/mod.ts";
-import { exists } from "https://deno.land/std@0.213.0/fs/exists.ts";
+import { relative, dirname, join, basename, exists, createServer, Plugin } from './deps.ts';
 
 type PrevisOption = {
   cwd: string;
@@ -24,7 +22,7 @@ export enum PreviewType {
   Vue = "vue",
 }
 
-function buildPreviewViteConfig(base: string) {
+function buildPreviewConfig(base: string) {
   return `import config from '../${base}';
 export default {
   ...config,
@@ -36,7 +34,7 @@ export default {
 `;
 }
 
-function buildVanillaViteConfig() {
+function buildVanillaConfig() {
   return `// generated
 import { defineConfig } from 'npm:vite@5.0.11';
 export default defineConfig({
@@ -247,9 +245,9 @@ export async function initializePreviewProject({
   // generate vite.config.mts
   if (configPath) {
     const base = basename(configPath);
-    await ensureFile(join(previewDir, 'vite.config.mts'), buildPreviewViteConfig(base));
+    await ensureFile(join(previewDir, 'vite.config.mts'), buildPreviewConfig(base));
   } else {
-    await ensureFile(join(previewDir, 'vite.config.mts'), buildVanillaViteConfig());
+    await ensureFile(join(previewDir, 'vite.config.mts'), buildVanillaConfig());
   }
 
   return {
@@ -295,7 +293,7 @@ export async function initializeVolatileProject({
   }
 
   // generate vite.config.mts
-  await ensureFile(join(previewDir, 'vite.config.mts'), buildVanillaViteConfig());
+  await ensureFile(join(previewDir, 'vite.config.mts'), buildVanillaConfig());
   return {
     previewDir,
     cleanup: () => {

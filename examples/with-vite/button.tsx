@@ -1,8 +1,8 @@
 export default function Button() {
-  // ボタンスタイルに赤い背景を設定
+  // ユーザーの要望に基づいて、ボタンの背景色を青に変更
   const buttonStyle = {
-    backgroundColor: 'red', // 背景色を赤に設定
-    color: 'white', // テキストを白に設定して読みやすくしています
+    backgroundColor: 'blue', // 背景色を青に設定
+    color: 'white', // テキストは白のままで、可読性を保つ
   };
 
   return <button type="button" style={buttonStyle}>Click me</button>
