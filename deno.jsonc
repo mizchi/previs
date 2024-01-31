@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "deno.window",
+      "deno.ns",
+      "deno.fetch",
+      "dom",
+      "dom.iterable",
+      "esnext",
+      "allow"
+    ],
+    "jsx": "react-jsx",
+    "jsxImportSource": "react"
+  }
+}
