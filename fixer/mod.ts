@@ -5,7 +5,12 @@ import { buildFirstPrompt, buildRetryPrompt, systemPrompt } from "./promptBuilde
 
 const MAX_RETRY = 3;
 
-export function createCodeFixer(targetFilepath: string, useImageModel: boolean, ssOutpath: string, action: () => Promise<void>) {
+export function createCodeFixer(
+  targetFilepath: string,
+  useImageModel: boolean,
+  ssOutpath: string,
+  action: (code: string) => Promise<void>,
+) {
   return {
     fix,
     hookSigintSignal,
@@ -75,7 +80,7 @@ export function createCodeFixer(targetFilepath: string, useImageModel: boolean, 
         return;
       }
     }
-    await action();
+    await action(outputCode);
     const response = prompt("この変更を採用しますか？ [y/N/追加条件]");
     if (response === "N") {
       await rollback();

@@ -51,12 +51,19 @@ await viteBuilder.ensureBuild();
 
 const browser = await startBrowser(screenshotPath, postBuildAction);
 
-const buildAndScreenshot = async () => {
+const buildAndScreenshot = async (code: string) => {
   await viteBuilder.ensureBuild();
   await browser.screenshot(screenshotUrl);
+  if (code) {
+    const tmpOutputPath = join(tmpdir, "output.tsx");
+    await Deno.writeTextFile(tmpOutputPath, code);
+    // console.log("output code:", code, tmpOutputPath);
+    // await $`cat ${tmpOutputPath}`;
+    await $`bat --language=tsx --style=grid ${tmpOutputPath}`;
+  }
 };
 
-await buildAndScreenshot();
+await buildAndScreenshot('');
 
 const codeFixer = createCodeFixer(previewTargetPath, useImageModel, screenshotPath, buildAndScreenshot);
 codeFixer.hookSigintSignal();
