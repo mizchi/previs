@@ -1,5 +1,5 @@
 #!/usr/bin/env -S deno run -A --ext=ts
-import { $, parseArgs } from './deps.ts';
+import { $, parseArgs } from '../deps.ts';
 import { parse, increment, format, type ReleaseType } from "https://deno.land/std@0.214.0/semver/mod.ts";
 
 const args = parseArgs({
