@@ -1,3 +1,3 @@
 export {
   startPrevis,
-} from "./builder.ts";
+} from "./builder/mod.ts";

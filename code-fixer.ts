@@ -1,7 +1,7 @@
 // import "https://deno.land/std@0.211.0/dotenv/load.ts";
 import { join, $, parseArgs } from "./deps.ts";
 import { startBrowser } from "./screenshot/mod.ts";
-import { startPrevis } from "./builder.ts";
+import { startPrevis } from "./builder/mod.ts";
 import { createCodeFixer } from "./fixer/mod.ts";
 
 const options = parseArgs({

@@ -1,5 +1,5 @@
 import { join, parseArgs } from "./deps.ts";
-import { startPrevis, initializeVolatileProject, findConfigDirectory, detectPreviewType } from "./builder.ts";
+import { startPrevis, initializeVolatileProject, findViteProjectDirectory, detectPreviewType } from "./builder/mod.ts";
 
 // TODO: separte init and run options
 const options = parseArgs({
@@ -46,7 +46,7 @@ const port = options.values.port ? Number(options.values.port) : 3000;
 const cmdOrTarget = options.positionals[0];
 
 if (cmdOrTarget === "init") {
-  const config = await findConfigDirectory(Deno.cwd());
+  const config = await findViteProjectDirectory(Deno.cwd());
   if (!config) {
     console.log("config not found");
     Deno.exit(1);
