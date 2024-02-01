@@ -1,7 +1,7 @@
 import { OpenAI } from "../deps.ts";
 import { AskOptions } from "./types.ts";
 import Spinner from 'https://deno.land/x/cli_spinners@v0.0.2/mod.ts';
-import { format } from "../deps.ts";
+import { prettier } from "../deps.ts";
 
 export async function requestRefinedCode(options: AskOptions) {
   const apiKey = getApiKey();
@@ -40,7 +40,7 @@ export async function requestRefinedCode(options: AskOptions) {
   }
   function extractCodeBlock(str: string) {
     const result = str.match(/```tsx\n([\s\S]+?)\n```/)?.[1] ?? '';
-    return format(result, { parser: "typescript" });
+    return prettier.format(result, { parser: "typescript" });
   }
 
   function getApiKey() {
