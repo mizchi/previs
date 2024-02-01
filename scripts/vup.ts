@@ -50,5 +50,5 @@ await $`git add README.md`;
 await $`git commit -m "chore: update previs version in README.md"`;
 
 await $`git tag ${newTag}`;
-await $`git push origin --tags`;
+await $`git push origin main --tags`;
 
