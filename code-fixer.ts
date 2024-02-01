@@ -1,7 +1,7 @@
 // import "https://deno.land/std@0.211.0/dotenv/load.ts";
 import { join, $, parseArgs } from "./deps.ts";
 import { startBrowser } from "./screenshot/mod.ts";
-import { startPrevisServer } from "./builder/mod.ts";
+import { startBuilder } from "./builder/mod.ts";
 import { createCodeFixer } from "./fixer/mod.ts";
 
 const options = parseArgs({
@@ -43,16 +43,16 @@ const previewTargetPath = join(Deno.cwd(), options.positionals[0]);
 const stylePath = options.values.style ? join(Deno.cwd(), options.values.style) : undefined;
 
 const postBuildAction = async () => { await $`imgcat ${screenshotPath}` };
-const viteBuilder = await startPrevisServer({
+const builder = await startBuilder({
   width: options.values.width!, height: options.values.height!,
-  cwd: Deno.cwd(), previewTargetPath, stylePath, port, volatile: true
+  cwd: Deno.cwd(), target: previewTargetPath, stylePath, port,
 });
-await viteBuilder.ensureBuild();
+await builder.ensureBuild();
 
 const browser = await startBrowser(screenshotPath, postBuildAction);
 
 const buildAndScreenshot = async (code: string) => {
-  await viteBuilder.ensureBuild();
+  await builder.ensureBuild();
   await browser.screenshot(screenshotUrl);
   if (code) {
     const tmpOutputPath = join(tmpdir, "output.tsx");
@@ -69,12 +69,12 @@ const codeFixer = createCodeFixer(previewTargetPath, useImageModel, screenshotPa
 codeFixer.hookSigintSignal();
 
 // first time
-const userPrompt = prompt("[どのように修正しますか?]");
+const userPrompt = prompt("[What do you want to fix?]");
 if (userPrompt) {
   const initialContent = await Deno.readTextFile(previewTargetPath);
   await codeFixer.fix(initialContent, userPrompt);
 }
 
 await codeFixer.cleanup();
-viteBuilder.close();
+builder.cleanup();
 await browser.close();

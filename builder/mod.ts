@@ -1,46 +1,29 @@
-import { relative, dirname, join, exists, createServer, Plugin } from '../deps.ts';
-import { InitVitePreviewProjectOption, PreviewType, PrevisOption, ViteSettings } from "./types.ts";
+import { relative, join, exists, createServer, Plugin } from '../deps.ts';
+import { InitVitePreviewProjectOption, PreviewType, BuilderOption, ViteSettings } from "./types.ts";
 import { buildReactProjectFiles } from "./react.ts";
 
-const VIRTUAL_ROOT_DIR = ".previs";
+const PREVIS_ROOT = ".previs";
 const TARGET_MARKER = "__TARGET__";
 
-const VITE_CONFIG_EXTENTIONS = [
-  '.ts',
-  '.js',
-  '.mjs',
-  '.mts',
-];
-
-const log = (...args: Array<unknown>) => {
-  console.log("[previs]", ...args);
-};
-
+const log = (...args: Array<unknown>) => console.log("[previs]", ...args);
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function startPrevisServer(options: PrevisOption) {
-  const defaultConfig: ViteSettings = {
-    isViteProject: false,
-    dir: options.cwd,
-    configPath: undefined
-  };
-  const viteSettings: ViteSettings = !options.ignore
-    ? await findViteProjectDirectory(options.cwd) ?? defaultConfig
-    : defaultConfig;
-  const previewRoot = await initializeVolatileProject({
-    ...viteSettings,
+export async function startBuilder(options: BuilderOption) {
+  const settings = await findProjectSettings(options.cwd);
+  await initializeProject({
+    ...settings,
     width: options.width,
     height: options.height,
-    stylePath: options.stylePath,
+    style: options.style,
   });
   const server = await createServer({
-    root: previewRoot.previewDir,
+    root: settings.virtualRoot,
     base: options.cwd,
-    configFile: viteSettings.isViteProject ? viteSettings.configPath : undefined,
+    configFile: settings.preExists ? settings.configPath : undefined,
     clearScreen: false,
     server: { port: options.port },
-    plugins: [virtualPreview(previewRoot.previewDir, options.previewTargetPath)],
-    cacheDir: join(previewRoot.previewDir, ".vite")
+    plugins: [virtualPreview(settings.virtualRoot, options.target)],
+    cacheDir: join(settings.virtualRoot, ".vite")
   });
   server.listen();
   log(`start http://localhost:${options.port}/`);
@@ -55,13 +38,35 @@ export async function startPrevisServer(options: PrevisOption) {
         }
       }
     },
-    close() {
+    cleanup() {
       server.close();
-      previewRoot.cleanup();
+      if (!settings.preExists) {
+        Deno.removeSync(settings.virtualRoot, { recursive: true });
+      }
     }
   };
+
+  // vite plugin
+  function virtualPreview(previewRoot: string, previewTargetPath: string) {
+    return {
+      name: 'preview',
+      enforce: 'pre',
+      async load(id) {
+        if (id.endsWith('entry.preview.tsx')) {
+          const raw = await Deno.readTextFile(join(previewRoot, 'entry.preview.tsx'));
+          const rel = relative(previewRoot, previewTargetPath);
+          const relPath = rel.startsWith(".") ? rel : "./" + rel;
+          if (!raw.includes(TARGET_MARKER)) {
+            throw new Error("invalid template");
+          }
+          return raw.replace(TARGET_MARKER, relPath);
+        }
+      },
+    } satisfies Plugin;
+  }
 }
 
+// TODO
 export function detectPreviewType(previewTargetPath: string): PreviewType {
   if (previewTargetPath.endsWith(".tsx")) {
     // TODO: detect react/preact/qwik
@@ -76,70 +81,70 @@ export function detectPreviewType(previewTargetPath: string): PreviewType {
   throw new Error("unknown preview type");
 }
 
-export async function findViteProjectDirectory(cwd: string): Promise<ViteSettings | undefined> {
-  let currentDir = cwd;
-  while (currentDir !== "/") {
-    for (const ext of VITE_CONFIG_EXTENTIONS) {
-      const configPath = join(currentDir, `vite.config${ext}`);
-      if (await exists(configPath)) {
-        return {
-          isViteProject: true,
-          dir: currentDir,
-          configPath,
-        }
-      }
+async function findProjectSettings(cwd: string): Promise<ViteSettings> {
+  // check default .previs
+  if (await exists(join(cwd, PREVIS_ROOT))) {
+    return {
+      preExists: true,
+      viteBase: cwd,
+      configPath: join(cwd, "vite.config.mts"),
+      virtualRoot: join(cwd, PREVIS_ROOT)
     }
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-    currentDir = parentDir;
-  }
-  return undefined;
+  };
+  // create temporal .previs-[hash]
+  const tmpHash = Math.random().toString(36).slice(2);
+  const previewDir = join(cwd, PREVIS_ROOT + "-" + tmpHash);
+  return {
+    preExists: false,
+    viteBase: cwd,
+    configPath: undefined,
+    virtualRoot: previewDir
+  };
 }
 
-export async function initializeVolatileProject({
+// const VITE_CONFIG_EXTENTIONS = [
+//   '.ts',
+//   '.js',
+//   '.mjs',
+//   '.mts',
+// ];
+// export async function findViteProjectDirectory(cwd: string): Promise<ViteSettings | undefined> {
+//   let currentDir = cwd;
+//   while (currentDir !== "/") {
+//     for (const ext of VITE_CONFIG_EXTENTIONS) {
+//       const configPath = join(currentDir, `vite.config${ext}`);
+//       if (await exists(configPath)) {
+//         return {
+//           preExists: true,
+//           dir: currentDir,
+//           configPath,
+//         }
+//       }
+//     }
+//     const parentDir = dirname(currentDir);
+//     if (parentDir === currentDir) {
+//       break;
+//     }
+//     currentDir = parentDir;
+//   }
+//   return undefined;
+// }
+
+export async function initializeProject({
   width,
   height,
-  dir,
-  stylePath,
+  style,
+  virtualRoot,
 }: InitVitePreviewProjectOption) {
-  const tmpHash = Math.random().toString(36).slice(2);
-  const previewDir = join(dir, VIRTUAL_ROOT_DIR + "-" + tmpHash);
-  await Deno.mkdir(previewDir, { recursive: true }).catch(() => { });
-
-  // now only for react
+  await Deno.mkdir(virtualRoot, { recursive: true }).catch(() => { });
   const files = buildReactProjectFiles({
     width,
     height,
-    stylePath,
-    previewDir
+    style,
+    previewDir: virtualRoot,
   });
   for (const [filename, content] of Object.entries(files)) {
-    await Deno.writeTextFile(join(previewDir, filename), content);
-  }
-  return {
-    previewDir,
-    cleanup: () => {
-      Deno.removeSync(previewDir, { recursive: true });
-    }
+    await Deno.writeTextFile(join(virtualRoot, filename), content);
   }
 }
 
-function virtualPreview(previewRoot: string, previewTargetPath: string) {
-  return {
-    name: 'preview',
-    enforce: 'pre',
-    async load(id) {
-      if (id.endsWith('entry.preview.tsx')) {
-        const raw = await Deno.readTextFile(join(previewRoot, 'entry.preview.tsx'));
-        const rel = relative(previewRoot, previewTargetPath);
-        const relPath = rel.startsWith(".") ? rel : "./" + rel;
-        if (!raw.includes(TARGET_MARKER)) {
-          throw new Error("invalid template");
-        }
-        return raw.replace(TARGET_MARKER, relPath);
-      }
-    },
-  } satisfies Plugin;
-}

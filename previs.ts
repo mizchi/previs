@@ -1,5 +1,5 @@
 import { join, parseArgs } from "./deps.ts";
-import { startPrevisServer, initializeVolatileProject, findViteProjectDirectory, detectPreviewType } from "./builder/mod.ts";
+import { startBuilder, initializeProject } from "./builder/mod.ts";
 
 // TODO: separte init and run options
 const options = parseArgs({
@@ -26,12 +26,13 @@ const options = parseArgs({
     },
     style: {
       type: 'string',
-      short: 's'
+      short: 's',
+      multiple: true,
     },
-    image: {
-      type: "boolean",
-      short: "i",
-    },
+    // image: {
+    //   type: "boolean",
+    //   short: "i",
+    // },
     port: {
       type: "string",
       short: "p",
@@ -41,55 +42,38 @@ const options = parseArgs({
   allowPositionals: true,
 });
 
-const port = options.values.port ? Number(options.values.port) : 3000;
+const first = options.positionals[0];
 
-const cmdOrTarget = options.positionals[0];
-
-if (cmdOrTarget === "init") {
-  const config = await findViteProjectDirectory(Deno.cwd());
-  if (!config) {
-    console.log("config not found");
-    Deno.exit(1);
+switch (first) {
+  case "init": {
+    const virtualRoot = join(Deno.cwd(), ".previs");
+    await initializeProject({
+      width: options.values.width!,
+      height: options.values.height!,
+      preExists: false,
+      virtualRoot,
+      viteBase: Deno.cwd(),
+      style: options.values.style?.map(s => join(Deno.cwd(), s)) ?? []
+    });
+    break;
   }
+  default: {
+    const target = join(Deno.cwd(), options.positionals[0]);
+    const style = options.values.style?.map(s => join(Deno.cwd(), s)) ?? []
 
-  const previewType = detectPreviewType(config.configPath!);
-  const stylePath = options.values.style ? join(Deno.cwd(), options.values.style) : undefined;
-
-  await initializeVolatileProject({
-    width: options.values.width!,
-    height: options.values.height!,
-    isViteProject: true,
-    dir: config.dir,
-    configPath: config.configPath!,
-    volatile: false,
-    stylePath: stylePath,
-    forceRewrite: false,
-    previewType,
-  });
-  Deno.exit(0);
-}
-
-// Run preview
-{
-  const previewTargetPath = join(Deno.cwd(), options.positionals[0]);
-  const stylePath = options.values.style ? join(Deno.cwd(), options.values.style) : undefined;
-
-  const viteBuilder = await startPrevisServer({
-    width: options.values.width!,
-    height: options.values.height!,
-    ignore: options.values.ignore,
-    cwd: Deno.cwd(),
-    previewTargetPath,
-    stylePath,
-    port,
-    volatile: true,
-    force: options.values.force,
-  });
-
-  // await viteBuilder.ensureBuild();
-
-  Deno.addSignalListener("SIGINT", () => {
-    viteBuilder.close();
-    Deno.exit(0);
-  });
+    const port = options.values.port ? Number(options.values.port) : 3000;
+    const builder = await startBuilder({
+      width: options.values.width!,
+      height: options.values.height!,
+      cwd: Deno.cwd(),
+      target,
+      style,
+      port,
+    });
+    // await viteBuilder.ensureBuild();
+    Deno.addSignalListener("SIGINT", () => {
+      builder.cleanup();
+      Deno.exit(0);
+    });
+  }
 }

@@ -1,12 +1,13 @@
-import { basename, relative } from "../deps.ts";
+import { relative } from "../deps.ts";
 import { CreateReactProjectOptions } from "./types.ts";
 
 const ENTRY_FILE_NAME = "entry.preview.tsx";
 
-export function buildReactProjectFiles({ width, height, stylePath, previewDir }: CreateReactProjectOptions) {
+export function buildReactProjectFiles({ width, height, style, previewDir }: CreateReactProjectOptions) {
+  const relativeStyles = style.map(s => relative(previewDir, s));
   return {
     'index.html': buildVirtualIndexHtml(width, height),
-    'entry.preview.tsx': buildReactEntry(basename(stylePath ?? "").split(".")[0], stylePath ? relative(previewDir, stylePath) : undefined),
+    'entry.preview.tsx': buildReactEntry('', relativeStyles),
     'vite.config.mts': buildVanillaConfig(),
   };
 }
@@ -45,18 +46,18 @@ function buildVirtualIndexHtml(width: string, height: string) {
 `;
 }
 
-
-function buildReactEntry(filename: string, styleRelativePath: string | undefined) {
+function buildReactEntry(filename: string, relativeStyles: string[]) {
+  const styleIntro = relativeStyles.map(s => `import '${s}';`).join('\n');
   return `// generated
-${styleRelativePath ? `import '${styleRelativePath}'` : '// no css'}
+${styleIntro}
 import { createRoot } from 'react-dom/client';
 // @ts-ignore
 import * as Target from "/__TARGET__";
 const root = document.getElementById('root');
 
 // select entry
-const C = Target.__PREVIEW__ ?? Target['${filename}'] ?? Target.default;
-createRoot(root).render(<C />);
+const Component = Target.__PREVIEW__ ?? Target['${filename}'] ?? Target.default;
+createRoot(root).render(<Component />);
 `;
 };
 

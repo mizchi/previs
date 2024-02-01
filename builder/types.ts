@@ -1,6 +1,7 @@
 export type ViteSettings = {
-  isViteProject: boolean;
-  dir: string;
+  preExists: boolean;
+  viteBase: string;
+  virtualRoot: string;
   configPath?: string;
 };
 
@@ -10,31 +11,24 @@ export enum PreviewType {
   Vue = "vue",
 }
 
-export type PrevisOption = {
+export type BuilderOption = {
   cwd: string;
-  previewTargetPath: string;
+  target: string;
   port: number;
   width: string;
   height: string;
-  stylePath?: string | undefined;
-  force?: boolean;
-  volatile?: boolean;
-  ignore?: boolean;
+  style: string[]
 };
 
-export type InitVitePreviewProjectOption = ViteSettings & {
+export interface InitVitePreviewProjectOption extends ViteSettings {
   width: string;
   height: string;
-  stylePath?: string;
-  // forceRewrite?: boolean;
-  // volatile?: boolean;
-  // previewType: PreviewType;
+  style: string[];
 };
 
 export type CreateReactProjectOptions = {
   width: string;
   height: string;
-  stylePath?: string;
+  style: string[];
   previewDir: string;
 };
-
