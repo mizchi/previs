@@ -1,42 +1,40 @@
 # previs
 
-Code generation toolkit for frontend components.
+Interactive AI markupper for programmers.
 
 ![previs example](ss.png)
-
-## What it is?
-
-- Standalone component preview
-- Screenshot
-- CLI Code fixing with OpenAI
-
-
 
 ## Install
 
 ```bash
 $ deno install -Af https://deno.land/x/previs@0.0.13/previs.ts
-
-## optional
-$ brew install bat rlwrap
 ```
 
-imgcat https://iterm2.com/documentation-images.html
+Optional dependencies
 
-## in vscode settings
-
-```json
-{
-  // in settings.json
-  "terminal.integrated.enableImages": true,
-}
-```
+- bat (terminal code highlighter) https://github.com/sharkdp/bat
+- imgcat (print image in vscode/iterm2) https://iterm2.com/documentation-images.html
+- vscode's `settings.json`: `"terminal.integrated.enableImages": true`
 
 ## How to use
 
-### preview
+Setup vite project and run `previs fix ...`
+
+```bash
+$ previs fix button.tsx
+
+# with stylesheet (for tailwind and others)
+$ previs fix button.tsx  --style style.css
+```
+
+### Preview Convensions
 
 Put single file for preview in vite project.
+
+- exported `__PREVIEW__`
+- exported `deafult`
+
+Example.
 
 ```tsx
 // default or filename(caseless) component
@@ -57,7 +55,7 @@ export const __PREVIEW__ = () => {
 }
 ```
 
-Run previs with screenshot
+Run `previs` with screenshot.
 
 ```bash
 $ previs ss button.tsx
@@ -65,26 +63,25 @@ $ previs ss button.tsx
 <image output>
 ```
 
-### fix
-
-TBD
-
 ## TODO
 
 - [x] standalnoe vite builder
 - [x] code fixer
 - [x] screenshot
 - [x] react
-- [ ] preview: width height
-- [ ] documentation
+- [x] documentation
+- [x] load tailwind config
+- [ ] width/height on preview
 - [ ] show diff
 - [ ] svelte
-- [ ] tmp file fix
 - [ ] vue
-- [ ] library detection
+- [ ] qwik
+- [ ] preact
+- [ ] tmp file fix
+- [ ] library auto detection
 - [ ] tailwind cdn option
-- [x] load tailwind config
 - [ ] code format on rewrite
+- [ ] file named component detection
 
 ## LICENSE
 
