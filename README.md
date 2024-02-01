@@ -6,7 +6,7 @@ Code generation toolkit for frontend components.
 
 - Standalone component preview
 - Screenshot
-- CLI Code fixing with OpenAPI
+- CLI Code fixing with OpenAI
 
 ## Install
 
@@ -42,17 +42,11 @@ export const __PREVIEW__ = () => {
 
 ```bash
 # setup vite project
-$ previs -p 3001 button.tsx
-[previs] start http://localhost:3001/
+$ previs button.tsx
+[previs] start http://localhost:3434/
 ```
 
-### with tailwind
-
-TBD
-
-see examples/with-tailwind
-
-## previs code-fix
+## previs fix
 
 TBD
 
@@ -62,17 +56,15 @@ TBD
 - [x] code fixer
 - [x] screenshot
 - [x] react
-- [ ] preview width height
-- [ ] Localize
+- [ ] preview: width height
 - [ ] documentation
 - [ ] show diff
 - [ ] svelte
 - [ ] tmp file fix
 - [ ] vue
 - [ ] library detection
-- [ ] test retry
 - [ ] tailwind cdn option
-- [ ] load tailwind config
+- [x] load tailwind config
 - [ ] code format on rewrite
 
 ## LICENSE

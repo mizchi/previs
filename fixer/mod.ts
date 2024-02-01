@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { $, extname } from '../deps.ts';
-import { askStreamly } from "./ask.ts";
+import { requestRefinedCode } from "./request.ts";
 import { buildFirstPrompt, buildRetryPrompt, systemPrompt } from "./promptBuilder.ts";
 
 const MAX_RETRY = 3;
@@ -21,7 +21,7 @@ export function createCodeFixer(
     const testFilepath = await getTestFileName(targetFilepath);
     const testCode = testFilepath ? Deno.readTextFileSync(testFilepath) : undefined;
     const builtPrompt = buildFirstPrompt(code, userPrompt, testCode, oldPrompt);
-    let outputCode = await askStreamly({
+    let outputCode = await requestRefinedCode({
       image: useImageModel,
       messages: [
         {
@@ -60,7 +60,7 @@ export function createCodeFixer(
         // failded
         console.log("\n --- テストに失敗しました。修正して再生成します。---\n");
         const failMessage = testResult.stderr;
-        outputCode = await askStreamly({
+        outputCode = await requestRefinedCode({
           image: useImageModel,
           messages: [
             {
@@ -81,7 +81,7 @@ export function createCodeFixer(
       }
     }
     await action(outputCode);
-    const response = prompt("この変更を採用しますか？ [y/N/追加条件]");
+    const response = prompt("Accept？ [y/N/追加条件]");
     if (response === "N") {
       await rollback();
       return;

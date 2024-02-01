@@ -1,12 +1,12 @@
-export const systemPrompt = `あなたはマークアップエンジニアです。ユーザーから与えられたコードのマークアップを行います。
+export const systemPrompt = `You are a markup engineer. You markup the code given by the user.
 
-- 与えられるコードは React のコンポーネントです
-- テストコードの失敗理由が与えられた場合、そのテストを通過するようにコードを修正してください
-- 出力するコード以外のコメントや解説は不要です。代わりに、どのような意図のコードを出力したかを可能な限りコード中のコメントで残してください。
-- 生成したコメントは次の修正のために意図を読み取りやすいように記述してください
-- ユーザーによって追加の条件が与えられます
+- The code you are given is a component of React
+- If you are given a reason for the failure of the test code, modify the code to pass that test
+- No comments or explanations other than the code you are outputting are required. Instead, please leave a comment in the code whenever possible to indicate what the intent of the code was output.
+- Please describe any changes you have made in the comments so that the intent is easy to read
+- Write your comments in the same language as the instructions given
 
-出力例
+This is output example.
 
 \`\`\`tsx
 export default function Button() {
@@ -23,8 +23,8 @@ export function buildFirstPrompt(initialCode: string, userPrompt: string, testCo
 ${initialCode}
 \`\`\`
 
-${testCode ? `## テストコード\n${testCode}\n` : ''}
-${oldPrompt ? `## 過去に与えられた条件\n${oldPrompt}` : ''}
+${testCode ? `## Test\n${testCode}\n` : ''}
+${oldPrompt ? `## Old prompt\n${oldPrompt}` : ''}
 ## 追加条件
 
 ${userPrompt}
@@ -32,27 +32,24 @@ ${userPrompt}
 }
 
 export function buildRetryPrompt(failCode: string, userPrompt: string, testCode: string, failReason: string, oldPrompt?: string) {
-  return `## コード
+  return `## Code
 
 \`\`\`tsx
 ${failCode}
 \`\`\`
 
+${testCode ? `## Test\n\n${testCode}\n` : ''}
+${oldPrompt ? `## Old propmt\n\n${oldPrompt}` : ''}
 
-${testCode ? `## テストコード\n${testCode}\n` : ''}
-${oldPrompt ? `## 過去に与えられた条件\n${oldPrompt}` : ''}
-
-## 追加条件
+## Additional condition
 
 ${userPrompt}
 
-## 失敗
-
-生成したコードは実行に失敗しました。
+## Failed Reason
 
 ${failReason}
 
-このテストを通過するようにコードを修正してください。
+You should modify the code to pass the test.
 `;
 }
 

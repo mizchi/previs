@@ -1,6 +1,6 @@
 import { puppeteer } from '../deps.ts';
 
-export async function startBrowser(screenshotPath: string, onTakeScreenshot: (url: string) => Promise<void>) {
+export async function startBrowser(screenshotPath: string, onTakeScreenshot?: (url: string) => Promise<void>) {
   // take screenshot
   const browser = await puppeteer.launch({
     // defaultViewport: {
@@ -38,7 +38,7 @@ export async function startBrowser(screenshotPath: string, onTakeScreenshot: (ur
         }
       });
       // await $`imgcat ${ssOutpath}`;
-      await onTakeScreenshot(url);
+      await onTakeScreenshot?.(url);
       return screenshotPath;
     },
     close: () => browser.close(),
