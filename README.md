@@ -7,7 +7,7 @@ Interactive AI markupper for programmers.
 ## Install
 
 ```bash
-$ deno install -Af https://deno.land/x/previs@0.0.13/previs.ts
+$ deno install -Af https://deno.land/x/previs@0.0.14/previs.ts
 ```
 
 Optional dependencies
