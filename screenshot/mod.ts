@@ -22,6 +22,11 @@ export async function startBrowser(screenshotPath: string, onTakeScreenshot?: (u
     async screenshot(url: string) {
       if (!initialized) {
         await page.goto(url);
+        await page.setViewport({
+          width: 1024,
+          height: 768,
+          deviceScaleFactor: 2,
+        })
         initialized = true;
       } else {
         await page.reload();

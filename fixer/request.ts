@@ -1,6 +1,7 @@
 import { OpenAI } from "../deps.ts";
 import { AskOptions } from "./types.ts";
 import Spinner from 'https://deno.land/x/cli_spinners@v0.0.2/mod.ts';
+import { format } from "../deps.ts";
 
 export async function requestRefinedCode(options: AskOptions) {
   const apiKey = getApiKey();
@@ -38,7 +39,8 @@ export async function requestRefinedCode(options: AskOptions) {
     if (options.printRaw) Deno.stdout.writeSync(encoder.encode(str));
   }
   function extractCodeBlock(str: string) {
-    return str.match(/```tsx\n([\s\S]+?)\n```/)?.[1] ?? '';
+    const result = str.match(/```tsx\n([\s\S]+?)\n```/)?.[1] ?? '';
+    return format(result, { parser: "typescript" });
   }
 
   function getApiKey() {
