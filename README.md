@@ -21,10 +21,11 @@ Optional dependencies
 Setup vite project and run `previs fix ...`
 
 ```bash
+$ export PREVIS_OPENAI_API_KEY=...
 $ previs fix button.tsx
 
 # with stylesheet (for tailwind and others)
-$ previs fix button.tsx  --style style.css
+$ previs fix button.tsx --style style.css
 ```
 
 ### Preview Convensions
