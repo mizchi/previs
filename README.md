@@ -11,7 +11,7 @@ Code generation toolkit for frontend components.
 ## Install
 
 ```bash
-$ deno install -Af https://deno.land/x/previs@v0.0.5/previs.ts
+$ deno install -Af https://deno.land/x/previs@0.0.12/previs.ts
 
 ## TODO: should be optional
 $ brew install bat rlwrap
