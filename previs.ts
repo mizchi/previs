@@ -1,5 +1,5 @@
 import { join, parseArgs } from "./deps.ts";
-import { startPrevis, initializeVolatileProject, findViteProjectDirectory, detectPreviewType } from "./builder/mod.ts";
+import { startPrevisServer, initializeVolatileProject, findViteProjectDirectory, detectPreviewType } from "./builder/mod.ts";
 
 // TODO: separte init and run options
 const options = parseArgs({
@@ -74,7 +74,7 @@ if (cmdOrTarget === "init") {
   const previewTargetPath = join(Deno.cwd(), options.positionals[0]);
   const stylePath = options.values.style ? join(Deno.cwd(), options.values.style) : undefined;
 
-  const viteBuilder = await startPrevis({
+  const viteBuilder = await startPrevisServer({
     width: options.values.width!,
     height: options.values.height!,
     ignore: options.values.ignore,

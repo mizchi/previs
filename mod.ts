@@ -1,3 +1,3 @@
 export {
-  startPrevis,
+  startPrevisServer,
 } from "./builder/mod.ts";

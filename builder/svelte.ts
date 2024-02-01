@@ -1,3 +1,4 @@
+// NOT USED YET
 const ENTRY_FILE_NAME = "entry.preview.tsx";
 
 export function buildSvelteConfig() {

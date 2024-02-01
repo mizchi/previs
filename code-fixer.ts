@@ -1,7 +1,7 @@
 // import "https://deno.land/std@0.211.0/dotenv/load.ts";
 import { join, $, parseArgs } from "./deps.ts";
 import { startBrowser } from "./screenshot/mod.ts";
-import { startPrevis } from "./builder/mod.ts";
+import { startPrevisServer } from "./builder/mod.ts";
 import { createCodeFixer } from "./fixer/mod.ts";
 
 const options = parseArgs({
@@ -43,7 +43,7 @@ const previewTargetPath = join(Deno.cwd(), options.positionals[0]);
 const stylePath = options.values.style ? join(Deno.cwd(), options.values.style) : undefined;
 
 const postBuildAction = async () => { await $`imgcat ${screenshotPath}` };
-const viteBuilder = await startPrevis({
+const viteBuilder = await startPrevisServer({
   width: options.values.width!, height: options.values.height!,
   cwd: Deno.cwd(), previewTargetPath, stylePath, port, volatile: true
 });

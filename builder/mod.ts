@@ -1,8 +1,6 @@
 import { relative, dirname, join, exists, createServer, Plugin } from '../deps.ts';
 import { InitVitePreviewProjectOption, PreviewType, PrevisOption, ViteSettings } from "./types.ts";
-import {
-  buildReactProjectFiles
-} from "./react.ts";
+import { buildReactProjectFiles } from "./react.ts";
 
 const VIRTUAL_ROOT_DIR = ".previs";
 const TARGET_MARKER = "__TARGET__";
@@ -20,7 +18,7 @@ const log = (...args: Array<unknown>) => {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function startPrevis(options: PrevisOption) {
+export async function startPrevisServer(options: PrevisOption) {
   const defaultConfig: ViteSettings = {
     isViteProject: false,
     dir: options.cwd,
