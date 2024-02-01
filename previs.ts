@@ -1,7 +1,7 @@
 import { join, parseArgs, $ } from "./deps.ts";
 import { startBuilder, initializeProject } from "./builder/mod.ts";
 import { startBrowser } from "./screenshot/mod.ts";
-import { createCodeFixer } from "./fixer/mod.ts";
+import { createFixer } from "./fixer/mod.ts";
 
 const defaultPort = "3434"
 
@@ -32,6 +32,10 @@ const options = parseArgs({
       type: 'string',
       short: 's',
       multiple: true,
+    },
+    printRaw: {
+      type: 'boolean',
+      short: 'r',
     },
     // image: {
     //   type: "boolean",
@@ -118,13 +122,25 @@ switch (first) {
         if (await hasCommand("bat")) {
           await $`bat --language=tsx --style=grid ${tmpOutputPath}`;
         }
+        // TODO: use batdiff
+        // if (await hasCommand("batdiff")) {
+        //   await $`bat --language=tsx --style=grid ${tmpOutputPath}`;
+        // }
+
       }
     };
 
     await buildAndScreenshot('');
 
     const useImageModel = false;
-    const codeFixer = createCodeFixer(target, useImageModel, screenshotPath, buildAndScreenshot);
+    const printRaw = !!options.values.printRaw;
+    const codeFixer = createFixer({
+      target,
+      useImageModel,
+      screenshotPath,
+      printRaw,
+      action: buildAndScreenshot
+    });
     codeFixer.hookSigintSignal();
 
     // first time
@@ -165,7 +181,7 @@ async function runBuilder(target: string) {
 }
 
 async function hasCommand(command: string) {
-  const ret = await $`which ${command}`.noThrow();
+  const ret = await $`which ${command}`.noThrow().quiet();
   return ret.code === 0;
 }
 

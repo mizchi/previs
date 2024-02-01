@@ -1,16 +1,19 @@
 import { readFile } from 'node:fs/promises';
 import { $, extname } from '../deps.ts';
 import { requestRefinedCode } from "./request.ts";
-import { buildFirstPrompt, buildRetryPrompt, systemPrompt } from "./promptBuilder.ts";
+import { buildFirstPrompt, buildRetryPrompt, systemPrompt } from "./prompt.ts";
 
 const MAX_RETRY = 3;
 
-export function createCodeFixer(
-  targetFilepath: string,
-  useImageModel: boolean,
-  ssOutpath: string,
-  action: (code: string) => Promise<void>,
-) {
+type FixerOptions = {
+  target: string;
+  useImageModel: boolean;
+  screenshotPath: string;
+  printRaw: boolean;
+  action?: (code: string) => Promise<void>;
+}
+
+export function createFixer(options: FixerOptions) {
   return {
     fix,
     hookSigintSignal,
@@ -18,11 +21,12 @@ export function createCodeFixer(
   }
 
   async function fix(code: string, userPrompt: string, oldPrompt?: string) {
-    const testFilepath = await getTestFileName(targetFilepath);
+    const testFilepath = await getTestFileName(options.target);
     const testCode = testFilepath ? Deno.readTextFileSync(testFilepath) : undefined;
     const builtPrompt = buildFirstPrompt(code, userPrompt, testCode, oldPrompt);
     let outputCode = await requestRefinedCode({
-      image: useImageModel,
+      image: options.useImageModel,
+      printRaw: options.printRaw,
       messages: [
         {
           role: 'system',
@@ -30,7 +34,7 @@ export function createCodeFixer(
         },
         {
           role: 'user',
-          content: useImageModel ? [
+          content: options.useImageModel ? [
             {
               type: "text",
               text: builtPrompt,
@@ -38,7 +42,7 @@ export function createCodeFixer(
             {
               type: "image",
               image_url: {
-                url: `data:image/jpeg;base64,${await readFile(ssOutpath, 'base64')}`
+                url: `data:image/jpeg;base64,${await readFile(options.screenshotPath, 'base64')}`
               }
             }
           ] : builtPrompt,
@@ -61,7 +65,7 @@ export function createCodeFixer(
         console.log("\n --- テストに失敗しました。修正して再生成します。---\n");
         const failMessage = testResult.stderr;
         outputCode = await requestRefinedCode({
-          image: useImageModel,
+          image: options.useImageModel,
           messages: [
             {
               role: 'system',
@@ -80,8 +84,8 @@ export function createCodeFixer(
         return;
       }
     }
-    await action(outputCode);
-    const response = prompt("Accept？ [y/N/追加条件]");
+    await options.action?.(outputCode);
+    const response = prompt("Accept？ [y/N/Request]");
     if (response === "N") {
       await rollback();
       return;
@@ -103,21 +107,21 @@ export function createCodeFixer(
     });
   }
   async function updateWithBackup(newContent: string) {
-    const oldContent = await Deno.readTextFile(targetFilepath);
-    const backupName = targetFilepath + '.bk';
+    const oldContent = await Deno.readTextFile(options.target);
+    const backupName = options.target + '.bk';
     await Deno.writeTextFile(backupName, oldContent);
-    await Deno.writeTextFile(targetFilepath, newContent);
+    await Deno.writeTextFile(options.target, newContent);
   }
 
   async function rollback() {
-    const backupName = targetFilepath + '.bk';
+    const backupName = options.target + '.bk';
     const oldContent = await Deno.readTextFile(backupName);
-    await Deno.writeTextFile(targetFilepath, oldContent);
+    await Deno.writeTextFile(options.target, oldContent);
     await cleanup();
   }
 
   async function cleanup() {
-    const backupName = targetFilepath + '.bk';
+    const backupName = options.target + '.bk';
     if (!await exists(backupName)) return;
     await Deno.remove(backupName);
   }

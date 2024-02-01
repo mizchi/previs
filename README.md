@@ -2,24 +2,41 @@
 
 Code generation toolkit for frontend components.
 
+![previs example](ss.png)
+
 ## What it is?
 
 - Standalone component preview
 - Screenshot
 - CLI Code fixing with OpenAI
 
+
+
 ## Install
 
 ```bash
 $ deno install -Af https://deno.land/x/previs@0.0.12/previs.ts
 
-## TODO: should be optional
+## optional
 $ brew install bat rlwrap
 ```
 
-## previs preview
+imgcat https://iterm2.com/documentation-images.html
 
-Put file for preview.
+## in vscode settings
+
+```json
+{
+  // in settings.json
+  "terminal.integrated.enableImages": true,
+}
+```
+
+## How to use
+
+### preview
+
+Put single file for preview in vite project.
 
 ```tsx
 // default or filename(caseless) component
@@ -40,13 +57,15 @@ export const __PREVIEW__ = () => {
 }
 ```
 
+Run previs with screenshot
+
 ```bash
-# setup vite project
-$ previs button.tsx
+$ previs ss button.tsx
 [previs] start http://localhost:3434/
+<image output>
 ```
 
-## previs fix
+### fix
 
 TBD
 

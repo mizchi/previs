@@ -1,4 +1,4 @@
-export const systemPrompt = `You are a markup engineer. You markup the code given by the user.
+export const systemPrompt = `You are a markup engineer. You markup the code given by the user with request.
 
 - The code you are given is a component of React
 - If you are given a reason for the failure of the test code, modify the code to pass that test
@@ -17,7 +17,7 @@ export default function Button() {
 
 
 export function buildFirstPrompt(initialCode: string, userPrompt: string, testCode?: string, oldPrompt?: string) {
-  return `## コード
+  return `## Code
 
 \`\`\`tsx
 ${initialCode}
@@ -25,7 +25,8 @@ ${initialCode}
 
 ${testCode ? `## Test\n${testCode}\n` : ''}
 ${oldPrompt ? `## Old prompt\n${oldPrompt}` : ''}
-## 追加条件
+
+## Request
 
 ${userPrompt}
 `;

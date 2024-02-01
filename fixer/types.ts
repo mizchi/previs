@@ -16,7 +16,7 @@ export type AskOptions = {
   messages: ChatMessage[],
   type?: string,
   key?: string,
-  skipRaw?: boolean,
+  printRaw?: boolean,
   history?: boolean,
   "--": string[],
 }

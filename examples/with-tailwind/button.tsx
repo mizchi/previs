@@ -1,3 +1,11 @@
 export default function Button() {
-  return <button type="button" className="bg-red-600 text-white">Click me</button>
+  // Changed the button content from 'Click me' to 'button'
+  return (
+    <button
+      type="button"
+      className="bg-black text-white font-semibold py-2 px-4 rounded shadow hover:bg-red-700 transition-colors duration-300"
+    >
+      button
+    </button>
+  );
 }
