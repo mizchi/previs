@@ -23,7 +23,7 @@ export default defineConfig({
 `;
 }
 
-function buildVirtualIndexHtml(width: string, height: string) {
+function buildVirtualIndexHtml(width: string | undefined, height: string | undefined) {
   return `<!DOCTYPE html>
 <html lang="en">
 
@@ -33,7 +33,10 @@ function buildVirtualIndexHtml(width: string, height: string) {
   <title>Document</title>
   <style>
     html, body { margin: 0; padding: 0; }
-    #root { width: ${width}; height: ${height};  }
+    #root {
+      width: fit-content;
+      height: fit-content;
+    }
   </style>
   <script type="module" src="./${ENTRY_FILE_NAME}"></script>
 </head>

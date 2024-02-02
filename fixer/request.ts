@@ -14,7 +14,6 @@ export async function requestRefinedCode(options: AskOptions) {
     messages: options.messages as any,
     stream: true,
   });
-
   let spinner;
   if (!options.printRaw) {
     spinner = Spinner.getInstance();

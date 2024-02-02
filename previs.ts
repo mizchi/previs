@@ -12,12 +12,12 @@ const options = parseArgs({
     width: {
       type: "string",
       short: "w",
-      default: "100%",
+      // default: "100%",
     },
     height: {
       type: "string",
       short: "h",
-      default: "100%",
+      // default: "100%",
     },
     ignore: {
       type: "boolean",
@@ -56,8 +56,8 @@ switch (first) {
   case "init": {
     const virtualRoot = join(Deno.cwd(), ".previs");
     await initializeProject({
-      width: options.values.width!,
-      height: options.values.height!,
+      width: options.values.width ?? "fit-content",
+      height: options.values.height ?? "fit-content",
       preExists: false,
       virtualRoot,
       viteBase: Deno.cwd(),
@@ -80,7 +80,7 @@ switch (first) {
     const screenshotPath = join(tmpdir, "ss.png");[]
     const screenshotUrl = `http://localhost:${port}/`;
     await builder.ensureBuild();
-    const browser = await startBrowser(screenshotPath);
+    const browser = await startBrowser({ screenshotPath });
     await browser.screenshot(screenshotUrl);
     if (await hasCommand("imgcat")) {
       await $`imgcat ${screenshotPath}`;
@@ -107,12 +107,12 @@ switch (first) {
     const screenshotPath = join(tmpdir, "ss.png");[]
     const screenshotUrl = `http://localhost:${port}/`;
     await builder.ensureBuild();
-    const onBuildEnd = async () => {
+    const onScreenshot = async () => {
       if (await hasCommand("imgcat")) {
         await $`imgcat ${screenshotPath}`;
       }
     };
-    const browser = await startBrowser(screenshotPath, onBuildEnd);
+    const browser = await startBrowser({ screenshotPath, onScreenshot });
     const buildAndScreenshot = async (code: string) => {
       await builder.ensureBuild();
       await browser.screenshot(screenshotUrl);
@@ -171,8 +171,8 @@ async function runBuilder(target: string) {
   const port = Number(options.values.port || defaultPort);
 
   return await startBuilder({
-    width: options.values.width!,
-    height: options.values.height!,
+    width: options.values.width ?? "fit-content",
+    height: options.values.height ?? "fit-content",
     cwd: Deno.cwd(),
     target,
     style,

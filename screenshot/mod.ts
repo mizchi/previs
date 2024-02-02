@@ -1,6 +1,9 @@
 import { puppeteer } from '../deps.ts';
 
-export async function startBrowser(screenshotPath: string, onTakeScreenshot?: (url: string) => Promise<void>) {
+export async function startBrowser(options: {
+  screenshotPath: string,
+  onScreenshot?: (url: string) => Promise<void>
+}) {
   // take screenshot
   const browser = await puppeteer.launch({
     // defaultViewport: {
@@ -34,7 +37,7 @@ export async function startBrowser(screenshotPath: string, onTakeScreenshot?: (u
       const size = await this._getRootElementSize();
       await page.waitForSelector("#root");
       await page.screenshot({
-        path: screenshotPath,
+        path: options.screenshotPath,
         clip: {
           x: 0,
           y: 0,
@@ -43,8 +46,7 @@ export async function startBrowser(screenshotPath: string, onTakeScreenshot?: (u
         }
       });
       // await $`imgcat ${ssOutpath}`;
-      await onTakeScreenshot?.(url);
-      return screenshotPath;
+      await options.onScreenshot?.(url);
     },
     close: () => browser.close(),
   }
