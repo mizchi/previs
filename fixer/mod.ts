@@ -85,7 +85,7 @@ export function createFixer(options: FixerOptions) {
       }
     }
     await options.action?.(outputCode);
-    const response = prompt("Accept？ [y/N/Request]");
+    const response = await $.prompt("Accept？ [y/N/Request]");
     if (response === "N") {
       await rollback();
       return;

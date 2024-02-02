@@ -1,5 +1,5 @@
 export default function Button() {
-  // Changed the background color from black to blue and adjusted hover color
+  // Changed the background color to blue and the hover color to a darker blue
   return (
     <button
       type="button"

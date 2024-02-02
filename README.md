@@ -72,7 +72,8 @@ $ previs ss button.tsx
 - [x] react
 - [x] documentation
 - [x] load tailwind config
-- [ ] width/height on preview
+- [x] code format on rewrite
+- [x] width/height on preview
 - [ ] show diff
 - [ ] svelte
 - [ ] vue
@@ -81,7 +82,6 @@ $ previs ss button.tsx
 - [ ] tmp file fix
 - [ ] library auto detection
 - [ ] tailwind cdn option
-- [ ] code format on rewrite
 - [ ] file named component detection
 
 ## LICENSE

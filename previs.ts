@@ -1,4 +1,4 @@
-import { join, parseArgs, $ } from "./deps.ts";
+import { join, parseArgs, $, exists } from "./deps.ts";
 import { startBuilder, initializeProject } from "./builder/mod.ts";
 import { startBrowser } from "./screenshot/mod.ts";
 import { createFixer } from "./fixer/mod.ts";
@@ -9,6 +9,13 @@ const defaultPort = "3434"
 const options = parseArgs({
   args: Deno.args,
   options: {
+    debug: {
+      type: "boolean",
+      short: "d",
+    },
+    scale: {
+      type: "string",
+    },
     width: {
       type: "string",
       short: "w",
@@ -80,7 +87,8 @@ switch (first) {
     const screenshotPath = join(tmpdir, "ss.png");[]
     const screenshotUrl = `http://localhost:${port}/`;
     await builder.ensureBuild();
-    const browser = await startBrowser({ screenshotPath });
+    const scale = options.values.scale ?? typeof options.values.scale === "string" ? Number(options.values.scale) : undefined;
+    const browser = await startBrowser({ screenshotPath, scale, debug: options.values.debug });
     await browser.screenshot(screenshotUrl);
     if (await hasCommand("imgcat")) {
       await $`imgcat ${screenshotPath}`;
@@ -112,44 +120,48 @@ switch (first) {
         await $`imgcat ${screenshotPath}`;
       }
     };
-    const browser = await startBrowser({ screenshotPath, onScreenshot });
-    const buildAndScreenshot = async (code: string) => {
+    const scale = options.values.scale ?? typeof options.values.scale === "string" ? Number(options.values.scale) : undefined;
+    const browser = await startBrowser({
+      screenshotPath,
+      onScreenshot,
+      scale,
+      debug: options.values.debug
+    });
+    const buildAndScreenshot = async () => {
       await builder.ensureBuild();
       await browser.screenshot(screenshotUrl);
-      if (code) {
-        const tmpOutputPath = join(tmpdir, "output.tsx");
-        await Deno.writeTextFile(tmpOutputPath, code);
-        if (await hasCommand("bat")) {
-          await $`bat --language=tsx --style=grid ${tmpOutputPath}`;
+      if (await hasCommand("bat")) {
+        const backupOriginalPath = target + '.bk';
+        if (await exists(backupOriginalPath)) {
+          await $`git --no-pager diff --no-index --color=always ${target} ${backupOriginalPath}`.noThrow();
+        } else {
+          await $`bat --language=tsx --style=grid --paging=never ${target}`;
         }
-        // TODO: use batdiff
-        // if (await hasCommand("batdiff")) {
-        //   await $`bat --language=tsx --style=grid ${tmpOutputPath}`;
-        // }
-
+      } else {
+        await $`cat ${target}`;
       }
     };
 
-    await buildAndScreenshot('');
+    await buildAndScreenshot();
 
     const useImageModel = false;
     const printRaw = !!options.values.printRaw;
-    const codeFixer = createFixer({
+    const fixer = createFixer({
       target,
       useImageModel,
       screenshotPath,
       printRaw,
       action: buildAndScreenshot
     });
-    codeFixer.hookSigintSignal();
+    fixer.hookSigintSignal();
 
     // first time
-    const userPrompt = prompt("[What do you want to fix?]");
-    if (userPrompt) {
+    const userRequest = await $.prompt("What do you want to fix?");
+    if (userRequest) {
       const initialContent = await Deno.readTextFile(target);
-      await codeFixer.fix(initialContent, userPrompt);
+      await fixer.fix(initialContent, userRequest);
     }
-    await codeFixer.cleanup();
+    await fixer.cleanup();
     builder.cleanup();
     await browser.close();
     break;
