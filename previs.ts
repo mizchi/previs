@@ -167,6 +167,92 @@ switch (first) {
     break;
   }
 
+  case "create": {
+    const second = options.positionals[1];
+    if (!second) {
+      console.error("Please specify target file");
+      Deno.exit(1);
+    }
+    const target = join(Deno.cwd(), second);
+    // create a tmp file
+    await Deno.writeTextFile(target, `export default function () {\n  return <div>Hello</div>\n}`);
+
+    const port = Number(options.values.port || defaultPort);
+    const builder = await runBuilder(target);
+
+    // run ss-browser
+    const tmpdir = Deno.makeTempDirSync();
+    const screenshotPath = join(tmpdir, "ss.png");[]
+    const screenshotUrl = `http://localhost:${port}/`;
+    await builder.ensureBuild();
+    const onScreenshot = async () => {
+      if (await hasCommand("imgcat")) {
+        await $`imgcat ${screenshotPath}`;
+      }
+    };
+    const scale = options.values.scale ?? typeof options.values.scale === "string" ? Number(options.values.scale) : undefined;
+    const browser = await startBrowser({
+      screenshotPath,
+      onScreenshot,
+      scale,
+      debug: options.values.debug
+    });
+    const buildAndScreenshot = async () => {
+      await builder.ensureBuild();
+      await browser.screenshot(screenshotUrl);
+      if (await hasCommand("bat")) {
+        const originalPath = target + '.bk';
+        if (await exists(originalPath)) {
+          await $`git --no-pager diff --no-index --color=always ${originalPath} ${target}`.noThrow();
+        } else {
+          await $`bat --language=tsx --style=grid --paging=never ${target}`;
+        }
+      } else {
+        await $`cat ${target}`;
+      }
+    };
+
+    // await buildAndScreenshot();
+
+    const useImageModel = false;
+    const printRaw = !!options.values.printRaw;
+    const fixer = createFixer({
+      target,
+      useImageModel,
+      screenshotPath,
+      printRaw,
+      action: buildAndScreenshot
+    });
+    fixer.hookSigintSignal();
+
+    // first time
+    const request = await $.prompt("What is this component?");
+    if (!request) break;
+
+    const newCode = await fixer.create(target, request);
+    await Deno.writeTextFile(target, newCode);
+
+    if (await hasCommand("bat")) {
+      await $`bat --language=tsx --style=grid --paging=never ${target}`;
+    } else {
+      await $`cat ${target}`;
+    }
+
+    const response = await $.prompt("Accept？ [y/N/Request]");
+    if (response === "N") {
+      await Deno.remove(target);
+      break;
+    }
+
+    if (response === "y" || response === "Y") {
+      await Deno.writeTextFile(target, newCode);
+    }
+
+    builder.cleanup();
+    await browser.close();
+    break;
+  }
+
   default: {
     const target = join(Deno.cwd(), first);
     const builder = await runBuilder(target);

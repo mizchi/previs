@@ -10,13 +10,3 @@ export type ChatMessage = {
     }
   }>
 };
-
-export type AskOptions = {
-  image: boolean,
-  messages: ChatMessage[],
-  type?: string,
-  key?: string,
-  printRaw?: boolean,
-  history?: boolean,
-  "--": string[],
-}

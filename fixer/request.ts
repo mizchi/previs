@@ -1,7 +1,17 @@
 import { OpenAI } from "../deps.ts";
-import { AskOptions } from "./types.ts";
+import { ChatMessage } from "./types.ts";
 import Spinner from 'https://deno.land/x/cli_spinners@v0.0.2/mod.ts';
 import { prettier } from "../deps.ts";
+
+type AskOptions = {
+  image: boolean,
+  messages: ChatMessage[],
+  type?: string,
+  key?: string,
+  printRaw?: boolean,
+  history?: boolean,
+  onProgress?: (state: string) => void,
+}
 
 export async function requestRefinedCode(options: AskOptions) {
   const apiKey = getApiKey();
@@ -14,12 +24,13 @@ export async function requestRefinedCode(options: AskOptions) {
     messages: options.messages as any,
     stream: true,
   });
+
+  // TODO: Refactor to other file
   let spinner;
   if (!options.printRaw) {
     spinner = Spinner.getInstance();
     spinner.start('generating...');
     spinner.setSpinnerType('dots8');
-    spinner.setText('generating...');
   }
   let result = '';
   for await (const chunk of stream) {
@@ -27,6 +38,9 @@ export async function requestRefinedCode(options: AskOptions) {
     if (!out) continue;
     result += out;
     write(out);
+
+    spinner?.setText(`generating... ${result.length}`);
+    options.onProgress?.(out);
   }
   write('\n');
   if (!options.printRaw && spinner) {

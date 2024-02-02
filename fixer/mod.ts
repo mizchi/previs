@@ -1,7 +1,9 @@
+export { buildMarkupper } from './markupper.ts';
+
 import { readFile } from 'node:fs/promises';
-import { $, extname } from '../deps.ts';
+import { $, extname, exists } from '../deps.ts';
 import { requestRefinedCode } from "./request.ts";
-import { buildFirstPrompt, buildRetryPrompt, systemPrompt } from "./prompt.ts";
+import { buildMarkupper } from "./markupper.ts";
 
 const MAX_RETRY = 3;
 
@@ -14,41 +16,41 @@ type FixerOptions = {
 }
 
 export function createFixer(options: FixerOptions) {
+  const markupper = buildMarkupper();
   return {
+    create,
     fix,
     hookSigintSignal,
     cleanup,
   }
 
+  async function create(filename: string, request: string) {
+    const messages = markupper.create({
+      filename, request,
+    });
+    const newCode = await requestRefinedCode({
+      image: options.useImageModel,
+      printRaw: options.printRaw,
+      messages: messages as any,
+    });
+    return newCode;
+  }
+
   async function fix(code: string, userPrompt: string, oldPrompt?: string) {
     const testFilepath = await getTestFileName(options.target);
-    const testCode = testFilepath ? Deno.readTextFileSync(testFilepath) : undefined;
-    const builtPrompt = buildFirstPrompt(code, userPrompt, testCode, oldPrompt);
+    const test = testFilepath ? Deno.readTextFileSync(testFilepath) : undefined;
+    const messages = markupper.fix({
+      code,
+      test: test,
+      request: userPrompt,
+      oldPrompt,
+      imageUrl: options.useImageModel ? `data:image/jpeg;base64,${await readFile(options.screenshotPath, 'base64')}` : undefined,
+    });
+
     let outputCode = await requestRefinedCode({
       image: options.useImageModel,
       printRaw: options.printRaw,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: options.useImageModel ? [
-            {
-              type: "text",
-              text: builtPrompt,
-            },
-            {
-              type: "image",
-              image_url: {
-                url: `data:image/jpeg;base64,${await readFile(options.screenshotPath, 'base64')}`
-              }
-            }
-          ] : builtPrompt,
-        }
-      ],
-      "--": [],
+      messages: messages as any,
     });
     await updateWithBackup(outputCode);
     // run test if exists
@@ -62,21 +64,18 @@ export function createFixer(options: FixerOptions) {
           break;
         }
         // failded
-        console.log("\n --- テストに失敗しました。修正して再生成します。---\n");
+        console.log("\n --- Test faild. Retry Again---\n");
         const failMessage = testResult.stderr;
+        const messages = markupper.retryWith({
+          code: outputCode,
+          request: userPrompt,
+          failReason: failMessage,
+          test: test!,
+          lastPrompt: userPrompt,
+        });
         outputCode = await requestRefinedCode({
           image: options.useImageModel,
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt,
-            },
-            {
-              role: 'user',
-              content: buildRetryPrompt(outputCode, userPrompt, testCode!, failMessage, oldPrompt),
-            }
-          ],
-          "--": [],
+          messages: messages as any,
         });
       }
       if (!passed) {
@@ -87,6 +86,7 @@ export function createFixer(options: FixerOptions) {
     await options.action?.(outputCode);
     const response = await $.prompt("Accept？ [y/N/Request]");
     if (response === "N") {
+      console.log("[rollback]");
       await rollback();
       return;
     }
@@ -134,9 +134,4 @@ async function getTestFileName(target: string): Promise<string | void> {
     return testFile;
   }
   return undefined;
-}
-
-
-async function exists(path: string): Promise<boolean> {
-  return await Deno.stat(path).then(() => true).catch(() => false);
 }

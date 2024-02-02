@@ -66,23 +66,36 @@ $ previs ss button.tsx
 
 ## TODO
 
-- [x] standalnoe vite builder
-- [x] code fixer
-- [x] screenshot
-- [x] react
-- [x] documentation
+- Commands
+  - [x] previs (serve)
+  - [x] previs ss (screenshot)
+  - [x] previs create
+  - [x] previs fix
+  - [ ] previs doctor
+- Integration
+  - [x] react
+  - [ ] svelte
+  - [ ] vue
+  - [ ] qwik
+  - [ ] preact
+  - [ ] astro
+  - [ ] htmx
+- Auto Detection
+  - [ ] UI library auto detection
+  - [ ] tailwind auto detection
+  - [ ] pandacss auto detection
+  - [ ] file named component detection
 - [x] load tailwind config
-- [x] code format on rewrite
+- [x] format
 - [x] width/height on preview
-- [ ] show diff
-- [ ] svelte
-- [ ] vue
-- [ ] qwik
-- [ ] preact
+- [x] show diff
+- [ ] refactor cli
+- [ ] cleanup pre/post
 - [ ] tmp file fix
-- [ ] library auto detection
 - [ ] tailwind cdn option
-- [ ] file named component detection
+- [ ] single binary
+- [ ] Fix retry
+- [ ] Web UI
 
 ## LICENSE
 
