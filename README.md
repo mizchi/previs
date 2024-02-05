@@ -96,6 +96,9 @@ $ previs ss button.tsx
 - [ ] single binary
 - [ ] Fix retry
 - [ ] Web UI
+- [ ] Vitest
+- [ ] --import option
+- [ ] VRT
 
 ## LICENSE
 

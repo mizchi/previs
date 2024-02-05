@@ -17,10 +17,11 @@ type FixerOptions = {
 
 export function createFixer(options: FixerOptions) {
   const markupper = buildMarkupper();
+  const backupName = options.target + '.bk';
   return {
     create,
     fix,
-    hookSigintSignal,
+    hookSignal,
     cleanup,
   }
 
@@ -36,17 +37,16 @@ export function createFixer(options: FixerOptions) {
     return newCode;
   }
 
-  async function fix(code: string, userPrompt: string, oldPrompt?: string) {
+  async function fix(code: string, request: string, oldPrompt?: string) {
     const testFilepath = await getTestFileName(options.target);
     const test = testFilepath ? Deno.readTextFileSync(testFilepath) : undefined;
     const messages = markupper.fix({
       code,
       test: test,
-      request: userPrompt,
+      request: request,
       oldPrompt,
       imageUrl: options.useImageModel ? `data:image/jpeg;base64,${await readFile(options.screenshotPath, 'base64')}` : undefined,
     });
-
     let outputCode = await requestRefinedCode({
       image: options.useImageModel,
       printRaw: options.printRaw,
@@ -68,10 +68,10 @@ export function createFixer(options: FixerOptions) {
         const failMessage = testResult.stderr;
         const messages = markupper.retryWith({
           code: outputCode,
-          request: userPrompt,
+          request: request,
           failReason: failMessage,
           test: test!,
-          lastPrompt: userPrompt,
+          lastPrompt: request,
         });
         outputCode = await requestRefinedCode({
           image: options.useImageModel,
@@ -95,35 +95,35 @@ export function createFixer(options: FixerOptions) {
       return;
     }
     // retry
-    await fix(outputCode, response!, userPrompt);
+    await fix(outputCode, response!, request);
   }
 
-  function hookSigintSignal() {
-    Deno.addSignalListener("SIGINT", async () => {
+  function hookSignal() {
+    const fn = async () => {
       console.log("[rollback by Ctrl+C]");
       await rollback();
       await cleanup();
       Deno.exit(0);
-    });
+    };
+    Deno.addSignalListener("SIGINT", fn);
+    return () => Deno.removeSignalListener("SIGINT", fn);
   }
   async function updateWithBackup(newContent: string) {
     const oldContent = await Deno.readTextFile(options.target);
-    const backupName = options.target + '.bk';
     await Deno.writeTextFile(backupName, oldContent);
     await Deno.writeTextFile(options.target, newContent);
   }
 
   async function rollback() {
-    const backupName = options.target + '.bk';
     const oldContent = await Deno.readTextFile(backupName);
     await Deno.writeTextFile(options.target, oldContent);
     await cleanup();
   }
 
   async function cleanup() {
-    const backupName = options.target + '.bk';
-    if (!await exists(backupName)) return;
-    await Deno.remove(backupName);
+    if (await exists(backupName)) {
+      await Deno.remove(backupName);
+    }
   }
 }
 

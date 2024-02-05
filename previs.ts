@@ -9,6 +9,10 @@ const defaultPort = "3434"
 const options = parseArgs({
   args: Deno.args,
   options: {
+    request: {
+      type: "string",
+      short: "r",
+    },
     debug: {
       type: "boolean",
       short: "d",
@@ -19,12 +23,10 @@ const options = parseArgs({
     width: {
       type: "string",
       short: "w",
-      // default: "100%",
     },
     height: {
       type: "string",
       short: "h",
-      // default: "100%",
     },
     ignore: {
       type: "boolean",
@@ -44,10 +46,10 @@ const options = parseArgs({
       type: 'boolean',
       short: 'r',
     },
-    // image: {
-    //   type: "boolean",
-    //   short: "i",
-    // },
+    useVision: {
+      type: "boolean",
+      short: "i",
+    },
     port: {
       type: "string",
       short: "p",
@@ -79,24 +81,12 @@ switch (first) {
       Deno.exit(1);
     }
     const target = join(Deno.cwd(), second);
-    const port = Number(options.values.port || defaultPort);
-    const builder = await runBuilder(target);
-
-    // run ss-browser
-    const tmpdir = Deno.makeTempDirSync();
-    const screenshotPath = join(tmpdir, "ss.png");[]
-    const screenshotUrl = `http://localhost:${port}/`;
-    await builder.ensureBuild();
-    const scale = options.values.scale ?? typeof options.values.scale === "string" ? Number(options.values.scale) : undefined;
-    const browser = await startBrowser({ screenshotPath, scale, debug: options.values.debug });
-    await browser.screenshot(screenshotUrl);
-    if (await hasCommand("imgcat")) {
-      await $`imgcat ${screenshotPath}`;
+    const ssbr = await runScreenshotBrowser(target);
+    await ssbr.screenshot();
+    if (await hasCmd("imgcat")) {
+      await $`imgcat ${ssbr.getScreenshotPath()}`;
     }
-
-    // cleanup
-    await browser.close();
-    builder.cleanup();
+    await ssbr.end();
     break;
   }
 
@@ -107,63 +97,21 @@ switch (first) {
       Deno.exit(1);
     }
     const target = join(Deno.cwd(), second);
-    const port = Number(options.values.port || defaultPort);
-    const builder = await runBuilder(target);
-
-    // run ss-browser
-    const tmpdir = Deno.makeTempDirSync();
-    const screenshotPath = join(tmpdir, "ss.png");[]
-    const screenshotUrl = `http://localhost:${port}/`;
-    await builder.ensureBuild();
-    const onScreenshot = async () => {
-      if (await hasCommand("imgcat")) {
-        await $`imgcat ${screenshotPath}`;
-      }
-    };
-    const scale = options.values.scale ?? typeof options.values.scale === "string" ? Number(options.values.scale) : undefined;
-    const browser = await startBrowser({
-      screenshotPath,
-      onScreenshot,
-      scale,
-      debug: options.values.debug
-    });
-    const buildAndScreenshot = async () => {
-      await builder.ensureBuild();
-      await browser.screenshot(screenshotUrl);
-      if (await hasCommand("bat")) {
-        const backupOriginalPath = target + '.bk';
-        if (await exists(backupOriginalPath)) {
-          await $`git --no-pager diff --no-index --color=always ${target} ${backupOriginalPath}`.noThrow();
-        } else {
-          await $`bat --language=tsx --style=grid --paging=never ${target}`;
-        }
-      } else {
-        await $`cat ${target}`;
-      }
-    };
-
-    await buildAndScreenshot();
-
     const useImageModel = false;
     const printRaw = !!options.values.printRaw;
-    const fixer = createFixer({
+
+    const ssbr = await runScreenshotBrowser(target);
+    await ssbr.screenshot();
+
+    const disposeFixer = await runFixer({
       target,
       useImageModel,
-      screenshotPath,
       printRaw,
-      action: buildAndScreenshot
+      screenshotPath: ssbr.getScreenshotPath(),
+      action: ssbr.screenshot
     });
-    fixer.hookSigintSignal();
-
-    // first time
-    const userRequest = await $.prompt("What do you want to fix?");
-    if (userRequest) {
-      const initialContent = await Deno.readTextFile(target);
-      await fixer.fix(initialContent, userRequest);
-    }
-    await fixer.cleanup();
-    builder.cleanup();
-    await browser.close();
+    disposeFixer();
+    await ssbr.end();
     break;
   }
 
@@ -174,89 +122,43 @@ switch (first) {
       Deno.exit(1);
     }
     const target = join(Deno.cwd(), second);
-    // create a tmp file
-    await Deno.writeTextFile(target, `export default function () {\n  return <div>Hello</div>\n}`);
-
-    const port = Number(options.values.port || defaultPort);
-    const builder = await runBuilder(target);
-
-    // run ss-browser
-    const tmpdir = Deno.makeTempDirSync();
-    const screenshotPath = join(tmpdir, "ss.png");[]
-    const screenshotUrl = `http://localhost:${port}/`;
-    await builder.ensureBuild();
-    const onScreenshot = async () => {
-      if (await hasCommand("imgcat")) {
-        await $`imgcat ${screenshotPath}`;
-      }
-    };
-    const scale = options.values.scale ?? typeof options.values.scale === "string" ? Number(options.values.scale) : undefined;
-    const browser = await startBrowser({
-      screenshotPath,
-      onScreenshot,
-      scale,
-      debug: options.values.debug
-    });
-    const buildAndScreenshot = async () => {
-      await builder.ensureBuild();
-      await browser.screenshot(screenshotUrl);
-      if (await hasCommand("bat")) {
-        const originalPath = target + '.bk';
-        if (await exists(originalPath)) {
-          await $`git --no-pager diff --no-index --color=always ${originalPath} ${target}`.noThrow();
-        } else {
-          await $`bat --language=tsx --style=grid --paging=never ${target}`;
-        }
-      } else {
-        await $`cat ${target}`;
-      }
-    };
-
-    // await buildAndScreenshot();
-
+    await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
+    const screenshot = await runScreenshotBrowser(target);
     const useImageModel = false;
     const printRaw = !!options.values.printRaw;
     const fixer = createFixer({
       target,
       useImageModel,
-      screenshotPath,
+      screenshotPath: screenshot.getScreenshotPath(),
       printRaw,
-      action: buildAndScreenshot
+      action: screenshot.screenshot
     });
-    fixer.hookSigintSignal();
+    fixer.hookSignal();
 
     // first time
-    const request = await $.prompt("What is this component?");
+    const request = options.values.request ?? await $.prompt("What is this component?");
     if (!request) break;
 
     const newCode = await fixer.create(target, request);
     await Deno.writeTextFile(target, newCode);
 
-    if (await hasCommand("bat")) {
-      await $`bat --language=tsx --style=grid --paging=never ${target}`;
-    } else {
-      await $`cat ${target}`;
-    }
+    await printCode(target);
 
-    const response = await $.prompt("Accept？ [y/N/Request]");
-    if (response === "N") {
+    const accepted = await $.confirm("Accept？ [y/N]");
+    if (!accepted) {
       await Deno.remove(target);
       break;
     }
-
-    if (response === "y" || response === "Y") {
+    if (accepted) {
       await Deno.writeTextFile(target, newCode);
     }
-
-    builder.cleanup();
-    await browser.close();
+    await screenshot.end();
     break;
   }
 
   default: {
     const target = join(Deno.cwd(), first);
-    const builder = await runBuilder(target);
-    // await viteBuilder.ensureBuild();
+    const builder = await runBuildServer(target);
     Deno.addSignalListener("SIGINT", () => {
       builder.cleanup();
       Deno.exit(0);
@@ -264,7 +166,7 @@ switch (first) {
   }
 }
 
-async function runBuilder(target: string) {
+async function runBuildServer(target: string) {
   const style = options.values.style?.map(s => join(Deno.cwd(), s)) ?? []
   const port = Number(options.values.port || defaultPort);
 
@@ -278,8 +180,84 @@ async function runBuilder(target: string) {
   });
 }
 
-async function hasCommand(command: string) {
+async function runScreenshotBrowser(target: string) {
+  const builder = await runBuildServer(target);
+  const scale = options.values.scale ?? typeof options.values.scale === "string" ? Number(options.values.scale) : undefined;
+  const tmpdir = Deno.makeTempDirSync();
+  const screenshotPath = join(tmpdir, "ss.png");
+  const port = Number(options.values.port || defaultPort);
+  const screenshotUrl = `http://localhost:${port}/`;
+  await builder.ensureBuild();
+  const onScreenshot = async () => {
+    if (await hasCmd("imgcat")) {
+      await $`imgcat ${screenshotPath}`;
+    }
+  };
+  const browser = await startBrowser({
+    screenshotPath,
+    onScreenshot,
+    scale,
+    debug: options.values.debug
+  });
+  return {
+    getScreenshotPath: () => screenshotPath,
+    async end() {
+      builder.cleanup();
+      await browser.close();
+    },
+    screenshot: async () => {
+      await builder.ensureBuild();
+      await browser.screenshot(screenshotUrl);
+      if (await hasCmd("bat")) {
+        const backupOriginalPath = `${target}.bk'`;
+        if (await exists(backupOriginalPath)) {
+          await $`git --no-pager diff --no-index --color=always ${target} ${backupOriginalPath}`.noThrow();
+        } else {
+          await $`bat --language=tsx --style=grid --paging=never ${target}`;
+        }
+      } else {
+        await $`cat ${target}`;
+      }
+    }
+  }
+}
+
+async function hasCmd(command: string) {
   const ret = await $`which ${command}`.noThrow().quiet();
   return ret.code === 0;
 }
 
+async function printCode(target: string) {
+  if (await hasCmd("bat")) {
+    await $`bat --language=tsx --style=grid --paging=never ${target}`;
+  } else {
+    await $`cat ${target}`;
+  }
+}
+
+async function runFixer(opts: {
+  target: string,
+  useImageModel: boolean,
+  printRaw: boolean,
+  screenshotPath: string,
+  action: () => Promise<void>,
+}) {
+  const fixer = createFixer({
+    target: opts.target,
+    useImageModel: opts.useImageModel,
+    screenshotPath: opts.screenshotPath,
+    printRaw: opts.printRaw,
+    action: opts.action
+  });
+  fixer.hookSignal();
+
+  // first time
+  const request = options.values.request ?? await $.prompt("What do you want to fix?");
+  if (request) {
+    const content = await Deno.readTextFile(opts.target);
+    await fixer.fix(content, request);
+  }
+  return () => {
+    fixer.cleanup();
+  }
+}

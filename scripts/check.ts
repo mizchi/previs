@@ -9,6 +9,9 @@ for await (const example of Deno.readDir(join(cwd, `examples`))) {
     console.log(`Checking ${example.name}`);
     await $`pnpm install`.quiet();
     switch (example.name) {
+      case "with-vitest": {
+        break;
+      }
       case 'with-svelte': {
         // TODO
         break;

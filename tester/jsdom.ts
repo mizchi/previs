@@ -11,4 +11,3 @@ export const render = (element: ReactElement) => {
     container: document.getElementById('root')!,
   });
 };
-
