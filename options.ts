@@ -13,6 +13,9 @@ const argsOptions = {
     type: "string",
     short: "r",
   },
+  auto: {
+    type: "boolean",
+  },
   debug: {
     type: "boolean",
     short: "d",

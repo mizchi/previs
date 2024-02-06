@@ -170,7 +170,7 @@ try {
       await fix(newOptions, target);
     } else {
       // run create if file not exists
-      console.log("[previs:create]");
+      console.log("[previs:gen]");
       await generate(newOptions, target);
     }
   }

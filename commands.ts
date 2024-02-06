@@ -36,27 +36,40 @@ export async function fix(options: PrevisOptions, target: string) {
 
   const vision = !!options.vision && uiMode;
   const tempTarget = getTempFilepath(target);
+  const auto = options.auto;
+
+  if (auto && !options.testCommand) {
+    throw new Error("testCommand is required for auto mode");
+  }
   await Deno.copyFile(target, tempTarget);
 
-  let ssbr: Awaited<ReturnType<typeof runScreenshotBrowser>> | undefined = undefined;
+  let runner: Awaited<ReturnType<typeof runScreenshotBrowser>> | undefined = undefined;
 
   if (uiMode) {
-    ssbr = await runScreenshotBrowser(options, target);
-    await ssbr.screenshot();
+    runner = await runScreenshotBrowser(options, target);
+    await runner.screenshot();
   }
+
+  let code = await Deno.readTextFile(tempTarget);
+  let failedReason: string | undefined = undefined;
 
   if (options.testCommand) {
-    await test(options, tempTarget);
+    const result = await runTest({ testCommand: options.testCommand, target: tempTarget });
+    if (result.code === 0) {
+      // test passed
+    } else {
+      failedReason = result.stderr;
+    }
   }
 
-  let request = options.request ?? await options.getInput("How to fix?");
+  let request = options.request ?? auto ? "Pass tests" : await options.getInput("How to fix?");
   if (!request) {
-    await ssbr?.end();
+    await runner?.end();
     await Deno.remove(tempTarget);
     return;
   };
-  let code = await Deno.readTextFile(tempTarget);
-  let failedReason: string | undefined = undefined;
+  // let code = await Deno.readTextFile(tempTarget);
+  // let failedReason: string | undefined = undefined;
 
   if (!request) return;
   while (true) {
@@ -70,14 +83,14 @@ export async function fix(options: PrevisOptions, target: string) {
           failedReason,
           testCommand: options.testCommand!,
           debug: options.debug,
-          getImage: (() => ssbr!.getImage()),
+          getImage: (() => runner!.getImage()),
         })
         : await getFixedComponent({
           code,
           vision,
           request: request!,
           debug: options.debug,
-          getImage: () => ssbr!.getImage(),
+          getImage: () => runner!.getImage(),
         });
     } else {
       newCode = failedReason
@@ -112,7 +125,14 @@ export async function fix(options: PrevisOptions, target: string) {
     }
     // save and screenshot
     await Deno.writeTextFile(tempTarget, newCode);
-    await ssbr?.screenshot();
+    await runner?.screenshot();
+
+    // pass 
+    if (auto) {
+      await Deno.rename(tempTarget, target);
+      break;
+    }
+
     request = await options.getInput("Accept? [y/N/Prompt]");
     if (request === "y") {
       await Deno.rename(tempTarget, target);
@@ -124,7 +144,7 @@ export async function fix(options: PrevisOptions, target: string) {
     }
     code = newCode;
   }
-  await ssbr?.end();
+  await runner?.end();
 }
 
 export async function test(options: PrevisOptions, target: string) {
@@ -145,17 +165,18 @@ export async function test(options: PrevisOptions, target: string) {
   }
 }
 
+
 export async function generate(options: PrevisOptions, target: string) {
   const uiMode = !target.endsWith(".ts");
 
   if (uiMode) {
     await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
-    const screenshot = await runScreenshotBrowser(options, target);
+    const runner = await runScreenshotBrowser(options, target);
     const vision = !!options.vision;
     const printRaw = !!options.printRaw;
 
     const tempTarget = getTempFilepath(target);
-    await screenshot.screenshot();
+    await runner.screenshot();
     // first time
     const request = options.request ?? await options.getInput("What is this file?");
     if (!request) return;
@@ -165,16 +186,16 @@ export async function generate(options: PrevisOptions, target: string) {
       printRaw,
       vision,
     });
-    await screenshot.screenshot();
+    await runner.screenshot();
     await Deno.writeTextFile(tempTarget, newCode);
-    await printCode(target);
-    const accepted = options.yes ?? await options.getConfirm("Accept？ [y/N]");
+    await printCode(tempTarget);
+    const accepted = options.yes ?? await options.getConfirm("Accept?");
     if (accepted) {
       await Deno.rename(tempTarget, target);
     } else {
       await Deno.remove(tempTarget);
     }
-    await screenshot.end();
+    await runner.end();
   } else {
     // non-ui mode
     await Deno.writeTextFile(target, 'export default function () {}');
@@ -189,8 +210,8 @@ export async function generate(options: PrevisOptions, target: string) {
       debug: !!options.debug,
     });
     await Deno.writeTextFile(tempTarget, newCode);
-    await printCode(target);
-    const accepted = options.yes ?? await options.getConfirm("Accept？ [y/N]");
+    await printCode(tempTarget);
+    const accepted = options.yes ?? await options.getConfirm("Accept?");
     if (accepted) {
       await Deno.rename(tempTarget, target);
     } else {
@@ -353,6 +374,13 @@ export async function doctor(_options: PrevisOptions) {
   // TODO: Check tailwindcss
 }
 
+
+async function runTest(options: { testCommand: string[], target: string }) {
+  const [cmd, ...args] = options.testCommand;
+  const newArgs = args.map(s => s.replace('__FILE__', options.target));
+  const testResult = await $`${cmd} ${newArgs}`.noThrow();
+  return testResult;
+}
 
 async function hasCmd(command: string) {
   const ret = await $`which ${command}`.noThrow().quiet();
