@@ -39,7 +39,7 @@ Base: ./
 ```bash
 $ previs button.tsx
 # with stylesheet (for tailwind and others)
-$ previs button.tsx --style style.css
+$ previs button.tsx --import style.css
 ```
 
 ### Preview Convensions
@@ -74,17 +74,19 @@ export const __PREVIEW__ = () => {
 
 ```bash
 # run after -- command before code accept and retry.
-$ previs button.tsx -- pnpm vitest --run
+$ previs button.tsx -- pnpm vitest --run __FILE__
 ```
 
 ## TODO
 
 - Commands
   - [x] previs
-  - [x] previs ss
   - [x] previs gen
   - [x] previs fix
   - [x] previs doctor
+  - [x] previs ss
+  - [x] previs test
+  - [ ] previs gen-test
   - [ ] previs init
 - Integration
   - [x] react
@@ -105,8 +107,6 @@ $ previs button.tsx -- pnpm vitest --run
 - [ ] width/height on preview
 - [ ] show diff
 - [ ] Web UI
-- [ ] test checker
-- [ ] --import option
 - [ ] VRT
 - Node package
   - [ ] @previs/helper

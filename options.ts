@@ -37,9 +37,9 @@ const argsOptions = {
     short: "f",
     default: false,
   },
-  style: {
+  import: {
     type: 'string',
-    short: 's',
+    short: 'i',
     multiple: true,
   },
   printRaw: {

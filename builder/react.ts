@@ -6,13 +6,13 @@ const ENTRY_FILE_NAME = "entry.preview.tsx";
 type CreateReactProjectOptions = {
   width?: string;
   height?: string;
-  style: string[];
+  imports: string[];
   previewDir: string;
   filename: string;
 };
 
-export function buildReactProjectFiles({ width, height, style, previewDir, filename }: CreateReactProjectOptions) {
-  const relativeImports = style.map(s => relative(previewDir, s));
+export function buildReactProjectFiles({ width, height, imports, previewDir, filename }: CreateReactProjectOptions) {
+  const relativeImports = imports.map(s => relative(previewDir, s));
   const exportedName = getExportedComponent(filename);
   return {
     'index.html': buildVirtualIndexHtml(width, height),

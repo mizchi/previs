@@ -1,4 +1,4 @@
-import { generate, fix, init, screenshot, serve, doctor } from "./commands.ts";
+import { generate, fix, init, screenshot, serve, doctor, test } from "./commands.ts";
 import { join, $, exists } from "./deps.ts";
 import { help, getParsedArgs, PrevisOptions } from "./options.ts"
 import { analyzeEnv } from "./utils.ts";
@@ -102,6 +102,7 @@ if (options.values.help) {
 const commandNamesWithTarget = [
   "doctor",
   "init",
+  "test",
   "screenshot",
   "ss",
   "fix",
@@ -140,6 +141,10 @@ try {
     if (!second) throw new Error("Please specify target file");
     const target = join(Deno.cwd(), second);
     switch (first) {
+      case "t":
+      case "test":
+        await test(newOptions, target);
+        break;
       case "screenshot":
       case "ss":
         await screenshot(newOptions, target);
@@ -156,18 +161,18 @@ try {
         await serve(newOptions, target);
         break;
     }
-  }
-
-  // no command
-  const target = join(Deno.cwd(), first);
-  if (await exists(target)) {
-    // run fix if exists
-    console.log("[previs:fix]");
-    await fix(newOptions, target);
   } else {
-    // run create if file not exists
-    console.log("[previs:create]");
-    await generate(newOptions, target);
+    // no command
+    const target = join(Deno.cwd(), first);
+    if (await exists(target)) {
+      // run fix if exists
+      console.log("[previs:fix]");
+      await fix(newOptions, target);
+    } else {
+      // run create if file not exists
+      console.log("[previs:create]");
+      await generate(newOptions, target);
+    }
   }
 } catch (err) {
   console.error(err);

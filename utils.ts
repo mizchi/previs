@@ -101,6 +101,18 @@ export async function findTailwindConfig(cwd: string) {
   return await findClosest(cwd, packageJsonChecker);
 }
 
+export async function findGitignore(cwd: string) {
+  const packageJsonChecker = async (currentDir: string) => {
+    const configPath = join(currentDir, '.gitignore');
+    if (await exists(configPath)) {
+      return configPath;
+    }
+    return undefined;
+  };
+  return await findClosest(cwd, packageJsonChecker);
+}
+
+
 export async function analyzeTarget(filepath: string) {
   // TODO: Solid
   // TODO: htmx
@@ -137,6 +149,7 @@ export async function analyzeTarget(filepath: string) {
 export type AnalyzedEnv = ReturnType<typeof analyzeEnv>;
 export async function analyzeEnv(cwd: string) {
   const viteDir = await findViteProjectDirectory(cwd);
+  const gitignore = await findGitignore(cwd);
   // const nodeModulesDir = await findNodeModulesDirectory(cwd);
   // const vscodeDir = await findVscodeSettingsDirectory(cwd);
   const packageJson = await findPackageJson(cwd);
@@ -174,6 +187,7 @@ export async function analyzeEnv(cwd: string) {
   return {
     base,
     cwd,
+    gitignore,
     viteDir,
     tsconfig,
     useTailwind,

@@ -17,7 +17,7 @@ for await (const example of Deno.readDir(join(cwd, `examples`))) {
         break;
       }
       case 'with-tailwind': {
-        await $`deno run -A ../../previs.ts ss -s index.css button.tsx`;
+        await $`deno run -A ../../previs.ts ss -i index.css button.tsx`;
         break;
       }
       default: {

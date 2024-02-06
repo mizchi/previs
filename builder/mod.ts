@@ -14,7 +14,7 @@ type BuilderOption = {
   port: number;
   width?: string;
   height?: string;
-  style: string[]
+  imports: string[]
 };
 
 export async function startBuilder(options: BuilderOption) {
@@ -23,7 +23,7 @@ export async function startBuilder(options: BuilderOption) {
     ...settings,
     width: options.width,
     height: options.height,
-    style: options.style,
+    imports: options.imports,
   }, options.target);
   const server = await createServer({
     root: settings.virtualRoot,
@@ -140,7 +140,7 @@ export async function initializeProject(
   {
     width,
     height,
-    style,
+    imports,
     virtualRoot,
   }: InitVitePreviewProjectOption,
   filename?: string
@@ -149,7 +149,7 @@ export async function initializeProject(
   const files = buildReactProjectFiles({
     width,
     height,
-    style,
+    imports,
     filename: filename ?? "index.tsx",
     previewDir: virtualRoot,
   });

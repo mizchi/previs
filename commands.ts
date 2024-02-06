@@ -38,6 +38,10 @@ export async function fix(options: PrevisOptions, target: string) {
   const ssbr = await runScreenshotBrowser(options, tempTarget);
   await ssbr.screenshot();
 
+  if (options.testCommand) {
+    await test(options, tempTarget);
+  }
+
   let request = await options.getInput("How to fix?");
   if (!request) {
     await ssbr.end();
@@ -68,7 +72,8 @@ export async function fix(options: PrevisOptions, target: string) {
       });
     if (options.testCommand) {
       const [cmd, ...args] = options.testCommand;
-      const testResult = await $`${cmd} ${args}`.noThrow();
+      const newArgs = args.map(s => s.replace('__FILE__', tempTarget));
+      const testResult = await $`${cmd} ${newArgs}`.noThrow();
       if (testResult.code === 0) {
         console.log("[previs] test passed");
         failedReason = undefined;
@@ -96,6 +101,24 @@ export async function fix(options: PrevisOptions, target: string) {
     code = newCode;
   }
   await ssbr.end();
+}
+
+export async function test(options: PrevisOptions, target: string) {
+  // const tempTarget = getTempFilepath(target);
+  if (!options.testCommand) {
+    throw new Error("testCommand is not set");
+  }
+  const [cmd, ...args] = options.testCommand;
+  const newArgs = args.map(s => s.replace('__FILE__', target));
+
+  // console.log(`[previs] Testing ${target} with ${cmd} ${newArgs.join(' ')}`);
+  const testResult = await $`${cmd} ${newArgs}`.noThrow();
+  if (testResult.code === 0) {
+    console.log("[previs] test passed");
+  } else {
+    // test failed
+    console.log("[previs] test failed");
+  }
 }
 
 export async function generate(options: PrevisOptions, target: string) {
@@ -138,14 +161,14 @@ export async function serve(options: PrevisOptions, target: string) {
 }
 
 async function runBuildServer(options: PrevisOptions, target: string) {
-  const style = options.style?.map(s => join(Deno.cwd(), s)) ?? []
+  const imports = options.import?.map(s => join(Deno.cwd(), s)) ?? []
   const port = Number(options.port || defaultPort);
   return await startBuilder({
     width: options.width ?? "fit-content",
     height: options.height ?? "fit-content",
     cwd: Deno.cwd(),
     target,
-    style,
+    imports,
     port,
   });
 }
@@ -210,11 +233,20 @@ export async function doctor(_options: PrevisOptions) {
     console.log("❌ PREVIS_OPENAI_API_KEY is not set. Please set it in .env or environment variable");
   }
 
-  const { viteDir, cwd, tsconfig, isReactJsx, libraryMode, packageJson, base } = await analyzeEnv(Deno.cwd());
+  const { viteDir, cwd, tsconfig, isReactJsx, libraryMode, packageJson, base, gitignore } = await analyzeEnv(Deno.cwd());
   if (viteDir) {
     console.log("✅ vite:", formatFilepath(viteDir.path));
   } else {
     console.log("❌ vite:", "Project is not setup for vite");
+  }
+
+  if (gitignore) {
+    const content = await Deno.readTextFile(gitignore.path);
+    if (content.includes(".previs*")) {
+      console.log("✅ .gitignore includes .previs*");
+    } else {
+      console.log("❌ .gitignore:", "Add .previs* to .gitignore");
+    }
   }
 
   if (packageJson) {

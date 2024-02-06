@@ -17,18 +17,18 @@ export type BuilderOption = {
   port: number;
   width?: string;
   height?: string;
-  style: string[]
+  imports: string[]
 };
 
 export interface InitVitePreviewProjectOption extends ViteSettings {
   width?: string;
   height?: string;
-  style: string[];
+  imports: string[];
 };
 
 export type CreateReactProjectOptions = {
   width?: string;
   height?: string;
-  style: string[];
+  imports: string[];
   previewDir: string;
 };
