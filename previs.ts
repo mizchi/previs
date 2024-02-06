@@ -1,223 +1,207 @@
-import { join, parseArgs, $, exists, type ParseArgsConfig } from "./deps.ts";
+import { join, $, exists } from "./deps.ts";
 import { startBuilder, initializeProject } from "./builder/mod.ts";
 import { startBrowser } from "./screenshot/mod.ts";
 import { createFixer } from "./fixer/mod.ts";
+import { help, getParsedArgs, PrevisOptions } from "./options.ts"
 
 const defaultPort = "3434"
+const options = getParsedArgs(Deno.args);
 
-// TODO: separte init and run options
-const parseArgsOptions = {
-  help: {
-    type: "boolean",
-    short: "h",
-  },
-  vision: {
-    type: "boolean",
-  },
-  request: {
-    type: "string",
-    short: "r",
-  },
-  debug: {
-    type: "boolean",
-    short: "d",
-  },
-  scale: {
-    type: "string",
-  },
-  width: {
-    type: "string",
-    short: "w",
-  },
-  height: {
-    type: "string",
-    short: "h",
-  },
-  queue: {
-    type: "string",
-    short: "q",
-  },
-  force: {
-    type: "boolean",
-    short: "f",
-    default: false,
-  },
-  style: {
-    type: 'string',
-    short: 's',
-    multiple: true,
-  },
-  printRaw: {
-    type: 'boolean',
-    short: 'r',
-  },
-  port: {
-    type: "string",
-    short: "p",
-    default: defaultPort,
-  },
-} as const;
-
-const previsCommandIntro = `usage:
-$ previs [options] <target-file>
-
-Examples:
-  # fix existed file
-  $ previs button.tsx
-
-  # fix existed file with css (like tailwindcss)
-  $ previs src/button.tsx --style src/image.css
-
-  # generate new file
-  $ previs src/button.tsx --input "This is button component"
-
-These are common Previs commands used in various situations:
-
-Doctor: checking environment
-  $ previs doctor
-
-Screenshot:
-  $ previs ss [options] <target>
-
-Serve:
-  $ previs serve [options] <target>
-`;
-
-function printHelp(options: NonNullable<ParseArgsConfig['options']>) {
-  let help = previsCommandIntro;
-  const keys = Object.keys(options);
-  for (const key of keys) {
-    const option = options[key];
-    const type = option.type;
-    const short = option.short;
-    const defaultValue = option.default;
-    help += `-${short}, --${key} <${type}>${defaultValue ? ` (default: ${defaultValue})` : ""}\n`;
+// ==== process helper ====
+const __disposes: Array<() => void | Promise<void>> = [];
+function addHook(disposeFn: () => void | Promise<void>) {
+  if (__disposes.length === 0) {
+    // hook once
+    Deno.addSignalListener("SIGINT", async () => {
+      for (const disposeFn of __disposes) {
+        try {
+          await disposeFn();
+        } catch (err) {
+          console.error('[previs:hooks:error]', err);
+        }
+      }
+      Deno.exit(1);
+    });
   }
-  console.log(help);
+  __disposes.push(disposeFn);
 }
 
-const options = parseArgs({
-  args: Deno.args,
-  options: parseArgsOptions,
-  allowPositionals: true,
-});
+async function exit(status: number) {
+  if (__disposes.length === 0) Deno.exit(status);
+  for (const disposeFn of __disposes) {
+    try {
+      await disposeFn();
+    } catch (err) {
+      console.error('[previs:hooks:error]', err);
+    }
+  }
+  Deno.exit(status);
+}
 
-const inputQueue = options.values.queue ? options.values.queue.split(",").map(s => s.trim()) : undefined;
-const first = options.positionals[0];
+const __queue = options.values.queue ? options.values.queue.split(",").map(s => s.trim()) : undefined;
+async function getInput(message: string): Promise<string | undefined> {
+  if (Array.isArray(__queue)) return __queue.shift();
+  return await $.prompt(message);
+}
+async function getConfirm(message: string): Promise<boolean> {
+  if (Array.isArray(__queue)) {
+    const next = __queue.shift();
+    return next === "y";
+  }
+  return await $.confirm(message);
+}
+
+// ==== commands ====
+
+async function init(options: PrevisOptions) {
+  const virtualRoot = join(Deno.cwd(), ".previs");
+  await initializeProject({
+    width: options.width ?? "fit-content",
+    height: options.height ?? "fit-content",
+    preExists: false,
+    virtualRoot,
+    viteBase: Deno.cwd(),
+    style: options.style?.map(s => join(Deno.cwd(), s)) ?? []
+  });
+}
+
+async function screenshot(_options: PrevisOptions, target: string) {
+  const ssbr = await runScreenshotBrowser(target);
+  await ssbr.screenshot();
+  if (await hasCmd("imgcat")) {
+    await $`imgcat ${ssbr.getScreenshotPath()}`;
+  }
+  await ssbr.end();
+}
+
+async function fix(options: PrevisOptions, target: string) {
+  const vision = !!options.vision;
+  const printRaw = !!options.printRaw;
+  const ssbr = await runScreenshotBrowser(target);
+  await ssbr.screenshot();
+  await runFixer({
+    target,
+    vision,
+    printRaw,
+    screenshotPath: ssbr.getScreenshotPath(),
+    action: ssbr.screenshot
+  });
+  await ssbr.end();
+}
+
+async function create(options: PrevisOptions, target: string) {
+  await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
+  const screenshot = await runScreenshotBrowser(target);
+  const vision = !!options.vision;
+  const printRaw = !!options.printRaw;
+
+  const fixer = createFixer({
+    target,
+    vision,
+    screenshotPath: screenshot.getScreenshotPath(),
+    printRaw,
+    action: screenshot.screenshot
+  });
+  fixer.hookSignal();
+
+  // first time
+  const request = await getInput("What is this component?");
+  if (!request) return;
+
+  const newCode = await fixer.create(target, request);
+  await Deno.writeTextFile(target, newCode);
+
+  await printCode(target);
+  const accepted = await getConfirm("Accept？ [y/N]");
+  if (!accepted) {
+    await Deno.remove(target);
+    return;
+  }
+  if (accepted) {
+    await Deno.writeTextFile(target, newCode);
+  }
+  await screenshot.end();
+}
+
+async function serve(options: PrevisOptions, target: string) {
+  const builder = await runBuildServer(target);
+  Deno.addSignalListener("SIGINT", () => {
+    builder.cleanup();
+    Deno.exit(0);
+  });
+}
+
+// run!
 
 if (options.values.help) {
-  printHelp(parseArgsOptions);
+  help();
   Deno.exit(0);
 }
 
-switch (first) {
-  case "init": {
-    const virtualRoot = join(Deno.cwd(), ".previs");
-    await initializeProject({
-      width: options.values.width ?? "fit-content",
-      height: options.values.height ?? "fit-content",
-      preExists: false,
-      virtualRoot,
-      viteBase: Deno.cwd(),
-      style: options.values.style?.map(s => join(Deno.cwd(), s)) ?? []
-    });
-    break;
-  }
-  case "ss": {
-    const second = options.positionals[1];
-    if (!second) {
-      console.error("Please specify target file");
-      Deno.exit(1);
-    }
-    const target = join(Deno.cwd(), second);
-    const ssbr = await runScreenshotBrowser(target);
-    await ssbr.screenshot();
-    if (await hasCmd("imgcat")) {
-      await $`imgcat ${ssbr.getScreenshotPath()}`;
-    }
-    await ssbr.end();
-    break;
-  }
-
-  case "fix": {
-    const second = options.positionals[1];
-    if (!second) {
-      console.error("Please specify target file");
-      Deno.exit(1);
-    }
-    const target = join(Deno.cwd(), second);
-    const vision = !!options.values.vision;
-    const printRaw = !!options.values.printRaw;
-
-    const ssbr = await runScreenshotBrowser(target);
-    await ssbr.screenshot();
-
-    const disposeFixer = await runFixer({
-      target,
-      vision,
-      printRaw,
-      screenshotPath: ssbr.getScreenshotPath(),
-      action: ssbr.screenshot
-    });
-    disposeFixer();
-    await ssbr.end();
-    break;
-  }
-
-  case "create": {
-    const second = options.positionals[1];
-    if (!second) {
-      console.error("Please specify target file");
-      Deno.exit(1);
-    }
-    const target = join(Deno.cwd(), second);
-    await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
-    const screenshot = await runScreenshotBrowser(target);
-    const vision = !!options.values.vision;
-    const printRaw = !!options.values.printRaw;
-
-    const fixer = createFixer({
-      target,
-      vision,
-      screenshotPath: screenshot.getScreenshotPath(),
-      printRaw,
-      action: screenshot.screenshot
-    });
-    fixer.hookSignal();
-
-    // first time
-    const request = await getInput("What is this component?");
-    if (!request) break;
-
-    const newCode = await fixer.create(target, request);
-    await Deno.writeTextFile(target, newCode);
-
-    await printCode(target);
-    const accepted = await getConfirm("Accept？ [y/N]");
-    if (!accepted) {
-      await Deno.remove(target);
+try {
+  const first = options.positionals[0];
+  switch (first) {
+    case "doctor": {
+      // TODO: check environment
       break;
     }
-    if (accepted) {
-      await Deno.writeTextFile(target, newCode);
+    case "init": {
+      await init(options.values);
+      break;
     }
-    await screenshot.end();
-    break;
+    case 'screenshot':
+    case "ss": {
+      const second = options.positionals[1];
+      if (!second) throw new Error("Please specify target file");
+      const target = join(Deno.cwd(), second);
+      await screenshot(options.values, target);
+      break;
+    }
+    case "fix": {
+      const second = options.positionals[1];
+      if (!second) throw new Error("Please specify target file");
+      const target = join(Deno.cwd(), second);
+      await fix(options.values, target);
+      break;
+    }
+    case "create": {
+      const second = options.positionals[1];
+      if (!second) throw new Error("Please specify target file");
+      const target = join(Deno.cwd(), second);
+      await create(options.values, target);
+      break;
+    }
+    case "serve": {
+      const second = options.positionals[1];
+      if (!second) throw new Error("Please specify target file");
+      const target = join(Deno.cwd(), second);
+      await serve(options.values, target);
+      break;
+    }
+    default: {
+      const target = join(Deno.cwd(), first);
+      if (await exists(target)) {
+        // run fix if exists
+        console.log("[previs:fix]");
+        await fix(options.values, target);
+      } else {
+        // run create if file not exists
+        console.log("[previs:create]");
+        await create(options.values, target);
+      }
+    }
   }
-  default: {
-    const target = join(Deno.cwd(), first);
-    const builder = await runBuildServer(target);
-    Deno.addSignalListener("SIGINT", () => {
-      builder.cleanup();
-      Deno.exit(0);
-    });
-  }
+} catch (err) {
+  console.error(err);
+  await exit(1);
+} finally {
+  // cleanup
+  await exit(0);
 }
 
 async function runBuildServer(target: string) {
   const style = options.values.style?.map(s => join(Deno.cwd(), s)) ?? []
   const port = Number(options.values.port || defaultPort);
-
   return await startBuilder({
     width: options.values.width ?? "fit-content",
     height: options.values.height ?? "fit-content",
@@ -295,31 +279,26 @@ async function runFixer(opts: {
     vision: opts.vision,
     screenshotPath: opts.screenshotPath,
     printRaw: opts.printRaw,
-    action: opts.action
+    // action: opts.action
   });
   fixer.hookSignal();
-
-  // first time
-  const request = await getInput("What do you want to fix?");
-  if (request) {
+  while (true) {
+    const request = await getInput("What do you want to fix?");
+    if (!request) return;
     const content = await Deno.readTextFile(opts.target);
-    await fixer.fix(content, request);
-  }
-  return () => {
-    fixer.cleanup();
+    const result = await fixer.fix(content, request);
+    if (result.ok) {
+      await opts.action?.();
+      const response = await $.prompt("Accept？ [y/N/Request]");
+      if (response === "N") {
+        console.log("[rollback]");
+        await fixer.rollback();
+        break;
+      }
+      if (response === "y" || response === "Y" || response === "yes" || response === "YES") {
+        await fixer.cleanup();
+      }
+    }
   }
 }
 
-// mock prompt for manual debug
-async function getInput(message: string): Promise<string | undefined> {
-  if (Array.isArray(inputQueue)) return inputQueue.shift();
-  return await $.prompt(message);
-}
-
-async function getConfirm(message: string): Promise<boolean> {
-  if (Array.isArray(inputQueue)) {
-    const next = inputQueue.shift();
-    return next === "y";
-  }
-  return await $.confirm(message);
-}

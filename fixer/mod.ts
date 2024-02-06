@@ -16,12 +16,17 @@ type FixerOptions = {
   action?: (code: string) => Promise<void>;
 }
 
+type FixOptions = {
+
+};
+
 export function createFixer(options: FixerOptions) {
   const markupper = buildMarkupper();
   const backupName = `${options.target}.bk`;
   return {
     create,
     fix,
+    rollback,
     hookSignal,
     cleanup,
   }
@@ -41,16 +46,16 @@ export function createFixer(options: FixerOptions) {
     return newCode;
   }
 
-  async function fix(code: string, request: string, oldPrompt?: string) {
+  async function fix(code: string, request: string, oldPrompt?: string): Promise<{
+    ok: true,
+    code: string,
+  } | {
+    ok: false,
+    reason: string,
+  }> {
     const testFilepath = await getTestFileName(options.target);
     const test = testFilepath ? Deno.readTextFileSync(testFilepath) : undefined;
-
-    // const b64image = options.vision ? await readFile(options.screenshotPath, 'base64') : undefined;
-    // console.log("b64image", b64image?.length);
-
-    const b64image = await readFile(new URL("../ss.png", import.meta.url)).then((buf) => buf.toString("base64"));
-
-    // const b64image = await readFile('../ss.png', 'base64');
+    const b64image = options.vision ? await readFile(options.screenshotPath, 'base64') : undefined;
     const messages = markupper.fix({
       code,
       test: test,
@@ -71,6 +76,7 @@ export function createFixer(options: FixerOptions) {
     if (testFilepath) {
       let retryCounter = 0;
       let passed = false;
+      let failedMessage = '';
       while (retryCounter++ < MAX_RETRY) {
         const testResult = await $`deno test -A --no-check ${testFilepath}`;
         if (testResult.code === 0) {
@@ -79,11 +85,11 @@ export function createFixer(options: FixerOptions) {
         }
         // failded
         console.log("\n --- Test faild. Retry Again---\n");
-        const failMessage = testResult.stderr;
+        failedMessage = testResult.stderr;
         const messages = markupper.retryWith({
           code: outputCode,
           request: request,
-          failReason: failMessage,
+          failReason: failedMessage,
           test: test,
           lastPrompt: request,
         });
@@ -94,22 +100,16 @@ export function createFixer(options: FixerOptions) {
       }
       if (!passed) {
         await rollback();
-        return;
+        return {
+          ok: false,
+          reason: failedMessage,
+        };
       }
     }
-    await options.action?.(outputCode);
-    const response = await $.prompt("Accept？ [y/N/Request]");
-    if (response === "N") {
-      console.log("[rollback]");
-      await rollback();
-      return;
+    return {
+      ok: true,
+      code: outputCode,
     }
-    if (response === "y" || response === "Y" || response === "yes" || response === "YES") {
-      await cleanup();
-      return;
-    }
-    // retry
-    await fix(outputCode, response, request);
   }
 
   function hookSignal() {
