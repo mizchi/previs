@@ -1,8 +1,8 @@
-import { ChatMessage } from './types.ts';
-export { buildMarkupper } from './markupper.ts';
-
 import { readFile } from 'node:fs/promises';
 import { $, extname, exists } from '../deps.ts';
+
+import { ChatMessage } from './types.ts';
+export { buildMarkupper } from './markupper.ts';
 import { requestNewCode, selectModel } from "./request.ts";
 import { buildMarkupper } from "./markupper.ts";
 
@@ -13,7 +13,6 @@ type FixerOptions = {
   vision: boolean;
   screenshotPath: string;
   printRaw: boolean;
-  // action?: (code: string) => Promise<void>;
 }
 
 export function createFixer(options: FixerOptions) {
@@ -23,8 +22,7 @@ export function createFixer(options: FixerOptions) {
     create,
     fix,
     rollback,
-    hookSignal,
-    cleanup,
+    updateWithConfirm,
   }
 
   async function create(filename: string, request: string) {
@@ -106,33 +104,21 @@ export function createFixer(options: FixerOptions) {
       code: outputCode,
     }
   }
-
-  function hookSignal() {
-    const fn = async () => {
-      console.log("[rollback by Ctrl+C]");
-      await rollback();
-      await cleanup();
-      Deno.exit(0);
-    };
-    Deno.addSignalListener("SIGINT", fn);
-    return () => Deno.removeSignalListener("SIGINT", fn);
-  }
   async function updateWithBackup(newContent: string) {
     const oldContent = await Deno.readTextFile(options.target);
     await Deno.writeTextFile(backupName, oldContent);
     await Deno.writeTextFile(options.target, newContent);
   }
 
+  async function updateWithConfirm(newContent: string) {
+    await Deno.writeTextFile(backupName, newContent);
+    await Deno.remove(backupName);
+  }
+
   async function rollback() {
     const oldContent = await Deno.readTextFile(backupName);
     await Deno.writeTextFile(options.target, oldContent);
-    await cleanup();
-  }
-
-  async function cleanup() {
-    if (await exists(backupName)) {
-      await Deno.remove(backupName);
-    }
+    await Deno.remove(backupName);
   }
 }
 

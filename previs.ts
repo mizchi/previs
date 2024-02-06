@@ -1,12 +1,8 @@
-import { create, fix, init, screenshot, serve } from "./commands.ts";
+import { generate, fix, init, screenshot, serve, doctor } from "./commands.ts";
 import { join, $, exists } from "./deps.ts";
-// import { startBuilder, initializeProject } from "./builder/mod.ts";
-// import { startBrowser } from "./screenshot/mod.ts";
-// import { createFixer } from "./fixer/mod.ts";
 import { help, getParsedArgs, PrevisOptions } from "./options.ts"
 
 const options = getParsedArgs(Deno.args);
-
 // ==== process helper ====
 const __disposes: Array<() => void | Promise<void>> = [];
 function addHook(disposeFn: () => void | Promise<void>) {
@@ -58,23 +54,28 @@ async function cleanTempFiles(dir: string) {
     // remove .previs* files
     if (entry.isDirectory && entry.name !== ".previs" && entry.name.startsWith(".previs")) {
       console.log("[previs:clean]", entry.name + '/*');
-      await Deno.remove(join(dir, entry.name), {
-        recursive: true,
-      });
+      await Deno.remove(join(dir, entry.name), { recursive: true, });
     }
-    // remove .bk files
+    // remove or rollback .bk files
     if (entry.isFile && entry.name.endsWith(".bk")) {
-      console.log("[previs:clean]", entry.name);
-      await Deno.remove(join(dir, entry.name));
+      const backupPath = join(dir, entry.name);
+      const originalPath = backupPath.replace(/\.bk$/, "");
+      const doRollback = await getConfirm(`[previs] Dirty file exists. Do you want to rollback ${originalPath}?`);
+      if (doRollback) {
+        const backupContent = await Deno.readTextFile(backupPath);
+        await Deno.writeTextFile(originalPath, backupContent);
+        await Deno.remove(backupPath);
+        console.log("[previs:rollback]", originalPath);
+        console.log("[previs:clean]", backupPath);
+      } else {
+        await Deno.remove(backupPath);
+        console.log("[previs:clean]", backupPath);
+      }
     }
   }
 }
 
-// ==== commands ====
-
-
-// run!
-
+// run
 if (options.values.help) {
   help();
   Deno.exit(0);
@@ -86,7 +87,9 @@ const commandNamesWithTarget = [
   "screenshot",
   "ss",
   "fix",
-  "create",
+  "g",
+  "gen",
+  "generate",
   "serve",
 ];
 try {
@@ -105,14 +108,13 @@ try {
     getConfirm,
   };
   if (first === 'doctor') {
-    console.log("Doctor is not implemented yet");
+    await doctor(newOptions);
     await exit(0);
   } else if (first === 'init') {
     await init(newOptions);
     await exit(0);
   }
-  const withTarget = commandNamesWithTarget.includes(first);
-  if (withTarget) {
+  if (commandNamesWithTarget.includes(first)) {
     const second = options.positionals[1];
     if (!second) throw new Error("Please specify target file");
     const target = join(Deno.cwd(), second);
@@ -124,8 +126,10 @@ try {
       case "fix":
         await fix(newOptions, target);
         break;
-      case "create":
-        await create(newOptions, target);
+      case "g":
+      case "gen":
+      case "generate":
+        await generate(newOptions, target);
         break;
       case "serve":
         await serve(newOptions, target);
@@ -133,7 +137,7 @@ try {
     }
   }
 
-  // no args
+  // no command
   const target = join(Deno.cwd(), first);
   if (await exists(target)) {
     // run fix if exists
@@ -142,7 +146,7 @@ try {
   } else {
     // run create if file not exists
     console.log("[previs:create]");
-    await create(newOptions, target);
+    await generate(newOptions, target);
   }
 } catch (err) {
   console.error(err);

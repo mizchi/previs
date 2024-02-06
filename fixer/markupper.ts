@@ -1,6 +1,4 @@
-import { readFile } from 'node:fs/promises';
 import { ChatContent, ChatMessage } from './types.ts';
-// import { ChatMessage } from "./types.ts";
 
 const INTRO = 'You are CSS specialist. You write typescript-jsx(tsx) code.';
 

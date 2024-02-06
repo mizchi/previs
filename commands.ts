@@ -6,6 +6,33 @@ import { startBrowser } from "./screenshot/mod.ts";
 
 const defaultPort = "3434";
 
+export async function doctor(_options: PrevisOptions) {
+  if (await hasCmd("code")) {
+    console.log("✅ code")
+  } else {
+    console.log("❌ code:", "Install vscode cli");
+  }
+
+  if (await hasCmd("imgcat")) {
+    console.log("✅ imgcat");
+  } else {
+    console.log("❌ imgcat:", "Install imgcat");
+  }
+
+  if (await hasCmd("bat")) {
+    console.log("✅ bat");
+  } else {
+    console.log("❌ bat:", "Install bat");
+  }
+
+  // TODO: Check puppeteer
+  // TODO: Check deno version
+  // TODO: Check vite environment
+  // TODO: Check node_modules
+  // TODO: Check tailwindcss
+}
+
+
 export async function init(options: PrevisOptions) {
   const virtualRoot = join(Deno.cwd(), ".previs");
   await initializeProject({
@@ -43,7 +70,7 @@ export async function fix(options: PrevisOptions, target: string) {
   await ssbr.end();
 }
 
-export async function create(options: PrevisOptions, target: string) {
+export async function generate(options: PrevisOptions, target: string) {
   await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
   const screenshot = await runScreenshotBrowser(options, target);
   const vision = !!options.vision;
@@ -168,7 +195,6 @@ async function runFixer(opts: {
     screenshotPath: opts.screenshotPath,
     printRaw: opts.printRaw,
   });
-  fixer.hookSignal();
   let prompt = await opts.getInput("How to fix?");
   if (!prompt) return;
   while (true) {
@@ -178,7 +204,7 @@ async function runFixer(opts: {
       await opts.post?.();
       prompt = await opts.getInput("Accept? [y/N/Prompt]");
       if (prompt === "y") {
-        await fixer.cleanup();
+        await fixer.updateWithConfirm(result.code);
         break;
       }
       if (prompt === "N") {
