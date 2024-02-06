@@ -88,27 +88,10 @@ Please write a new code for ${filename}!`,
           role: 'system',
           content: MARKUP_FIX_PROMPT,
         },
-        // {
-        //   role: 'user',
-        //   content: imageUrl ? withImage(fixingContent, imageUrl) : fixingContent,
-        // },
         {
           role: 'user',
-          content: [
-            {
-              type: "image",
-              image_url: {
-                url: `data:image/jpeg;base64,${imageUrl}`
-              }
-            },
-            {
-              type: "text",
-              text: fixingContent,
-            },
-
-          ]
-        }
-
+          content: imageUrl ? withImage(fixingContent, imageUrl) : fixingContent,
+        },
       ]
     },
     retryWith(opts: {

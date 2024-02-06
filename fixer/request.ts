@@ -24,10 +24,7 @@ export async function requestNewCode(options: RequestOptions) {
   const apiKey = getApiKey();
   const client = new OpenAI({ apiKey });
   const encoder = new TextEncoder();
-  // console.log(JSON.stringify(options.messages, null, 2));
-  await Deno.writeTextFile('out.json', JSON.stringify(options.messages, null, 2));
 
-  // console.log('input: messages', options.messages);
   const stream = await client.chat.completions.create({
     model: options.model ?? defaultModel,
     // @ts-ignore - `messages` is not in the type definition

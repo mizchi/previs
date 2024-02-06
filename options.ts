@@ -1,7 +1,5 @@
 import { parseArgs } from "./deps.ts";
 
-const defaultPort = "3434"
-
 const argsOptions = {
   help: {
     type: "boolean",
@@ -50,7 +48,6 @@ const argsOptions = {
   port: {
     type: "string",
     short: "p",
-    default: defaultPort,
   },
 } as const;
 
@@ -79,7 +76,12 @@ Serve:
   $ previs serve [options] <target>
 `;
 
-export type PrevisOptions = ReturnType<typeof getParsedArgs>['values'];
+export type PrevisOptions = ReturnType<typeof getParsedArgs>['values'] & {
+  addHook: (fn: () => void) => void;
+  exit: (code: number) => void;
+  getInput: (message: string) => Promise<string | undefined>;
+  getConfirm: (message: string) => Promise<boolean>;
+};
 
 export function getParsedArgs(args: string[]) {
   return parseArgs({

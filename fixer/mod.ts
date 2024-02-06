@@ -13,12 +13,8 @@ type FixerOptions = {
   vision: boolean;
   screenshotPath: string;
   printRaw: boolean;
-  action?: (code: string) => Promise<void>;
+  // action?: (code: string) => Promise<void>;
 }
-
-type FixOptions = {
-
-};
 
 export function createFixer(options: FixerOptions) {
   const markupper = buildMarkupper();
@@ -35,7 +31,6 @@ export function createFixer(options: FixerOptions) {
     const messages = markupper.create({
       filename, request,
     });
-
     const model = selectModel({ vision: options.vision });
     const newCode = await requestNewCode({
       model,

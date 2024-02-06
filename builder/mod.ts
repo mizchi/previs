@@ -38,11 +38,8 @@ export async function startBuilder(options: BuilderOption) {
         }
       }
     },
-    cleanup() {
+    end() {
       server.close();
-      if (!settings.preExists) {
-        Deno.removeSync(settings.virtualRoot, { recursive: true });
-      }
     }
   };
 
