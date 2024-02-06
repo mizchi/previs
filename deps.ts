@@ -8,3 +8,4 @@ export { OpenAI } from "https://deno.land/x/openai@v4.20.1/mod.ts";
 export { default as prettier } from "npm:prettier@2.4.1";
 export { default as Spinner } from 'https://deno.land/x/cli_spinners@v0.0.2/mod.ts';
 export { parse as parseJsonc } from "https://deno.land/std@0.214.0/jsonc/parse.ts";
+export { expect } from "https://deno.land/std@0.214.0/expect/mod.ts";

@@ -1,4 +1,4 @@
-import { dirname, exists, join, parseJsonc } from "./deps.ts";
+import { dirname, exists, join, parseJsonc, extname, basename, expect } from "./deps.ts";
 
 const VITE_CONFIG_EXTENTIONS = [
   '.ts',
@@ -13,7 +13,7 @@ const JSX_PRAGMA_REGEX = /@jsxImportSource\s+[^\s\*]+/;
 
 export async function findClosest(cwd: string, checker: (currentDir: string) => Promise<string | undefined>): Promise<{
   dir: string;
-  found: string;
+  path: string;
 } | undefined> {
   let currentDir = cwd;
   while (currentDir !== "/") {
@@ -21,7 +21,7 @@ export async function findClosest(cwd: string, checker: (currentDir: string) => 
     if (found) {
       return {
         dir: currentDir,
-        found: found,
+        path: found,
       }
     }
     const parentDir = dirname(currentDir);
@@ -143,11 +143,11 @@ export async function analyzeEnv(cwd: string) {
   const tailwindConfig = await findTailwindConfig(cwd);
   const tsconfig = await findTsconfigJson(cwd);
 
-  const useTailwind = tailwindConfig?.found ? true : false;
+  const useTailwind = tailwindConfig?.path ? true : false;
   let isReactJsx = false;
   let libraryMode: LibraryMode = "react";
-  if (tsconfig?.found) {
-    const content = await Deno.readTextFile(tsconfig.found);
+  if (tsconfig?.path) {
+    const content = await Deno.readTextFile(tsconfig.path);
     const config = parseJsonc(content, {
       allowTrailingComma: true,
     });
@@ -186,3 +186,15 @@ export async function analyzeEnv(cwd: string) {
   };
 }
 
+export function getTempFilepath(filepath: string) {
+  const ext = extname(filepath);
+  const base = basename(filepath);
+  const newPath = join(dirname(filepath), base.replace(ext, `.__previs__${ext}`));
+  return newPath;
+}
+
+Deno.test('getTempFilepath', () => {
+  expect(getTempFilepath('/tmp/foo/bar.ts')).toEqual('/tmp/foo/bar.__previs__.ts');
+  expect(getTempFilepath('/tmp/foo/bar.test.ts')).toEqual('/tmp/foo/bar.test.__previs__.ts');
+  expect(getTempFilepath('/tmp/foo/bar_test.ts')).toEqual('/tmp/foo/bar_test.__previs__.ts');
+});

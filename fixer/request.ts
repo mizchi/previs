@@ -67,7 +67,7 @@ export async function requestNewCode(options: RequestOptions) {
   function write(str: string) {
     if (options.printRaw) Deno.stdout.writeSync(encoder.encode(str));
   }
-  function extractCodeBlock(str: string) {
+  function extractCodeBlock(str: string): string {
     const result = str.match(/```tsx\n([\s\S]+?)\n```/)?.[1] ?? '';
     return prettier.format(result, { parser: "typescript" });
   }

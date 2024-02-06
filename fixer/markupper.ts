@@ -47,7 +47,7 @@ export function buildMarkupper() {
     reset() {
       // history = [];
     },
-    create(opts: {
+    generate(opts: {
       filename: string,
       request: string,
     }): ChatMessage[] {
