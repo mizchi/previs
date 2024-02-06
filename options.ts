@@ -50,6 +50,11 @@ const argsOptions = {
     type: "string",
     short: "p",
   },
+  yes: {
+    type: "boolean",
+    short: 'y'
+  },
+
 } as const;
 
 const HELP_INTRO = `usage:

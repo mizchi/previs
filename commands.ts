@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { startBuilder } from "./builder/mod.ts";
 import { join, $ } from "./deps.ts";
-import { getFixedCode, getNewCode, getRetryCode } from "./fixer/mod.ts";
+import { getFixedComponent, getNewComponent, getNewFunction, getRetriedComponent, getRetriedFunction } from "./fixer/mod.ts";
 import { PrevisOptions } from "./options.ts";
 import { startBrowser } from "./screenshot/mod.ts";
 import { analyzeEnv, getTempFilepath, pxToNumber } from "./utils.ts";
@@ -32,20 +32,26 @@ export async function screenshot(options: PrevisOptions, target: string) {
 }
 
 export async function fix(options: PrevisOptions, target: string) {
-  const vision = !!options.vision;
+  const uiMode = !target.endsWith(".ts");
+
+  const vision = !!options.vision && uiMode;
   const tempTarget = getTempFilepath(target);
   await Deno.copyFile(target, tempTarget);
 
-  const ssbr = await runScreenshotBrowser(options, target);
-  await ssbr.screenshot();
+  let ssbr: Awaited<ReturnType<typeof runScreenshotBrowser>> | undefined = undefined;
+
+  if (uiMode) {
+    ssbr = await runScreenshotBrowser(options, target);
+    await ssbr.screenshot();
+  }
 
   if (options.testCommand) {
     await test(options, tempTarget);
   }
 
-  let request = await options.getInput("How to fix?");
+  let request = options.request ?? await options.getInput("How to fix?");
   if (!request) {
-    await ssbr.end();
+    await ssbr?.end();
     await Deno.remove(tempTarget);
     return;
   };
@@ -54,23 +60,40 @@ export async function fix(options: PrevisOptions, target: string) {
 
   if (!request) return;
   while (true) {
-    const newCode = failedReason
-      ? await getRetryCode({
-        code,
-        vision,
-        request: request!,
-        failedReason,
-        testCommand: options.testCommand!,
-        debug: options.debug,
-        getImage: () => ssbr.getImage(),
-      })
-      : await getFixedCode({
-        code,
-        vision,
-        request: request!,
-        debug: options.debug,
-        getImage: () => ssbr.getImage(),
-      });
+    let newCode: string;
+    if (uiMode) {
+      newCode = failedReason
+        ? await getRetriedComponent({
+          code,
+          vision,
+          request: request!,
+          failedReason,
+          testCommand: options.testCommand!,
+          debug: options.debug,
+          getImage: (() => ssbr!.getImage()),
+        })
+        : await getFixedComponent({
+          code,
+          vision,
+          request: request!,
+          debug: options.debug,
+          getImage: () => ssbr!.getImage(),
+        });
+    } else {
+      newCode = failedReason
+        ? await getRetriedFunction({
+          code,
+          testCommand: options.testCommand!,
+          request: request!,
+          debug: !!options.debug,
+          failedReason,
+        })
+        : await getNewFunction({
+          target,
+          request: request!,
+          debug: !!options.debug,
+        });
+    }
     if (options.testCommand) {
       const [cmd, ...args] = options.testCommand;
       const newArgs = args.map(s => s.replace('__FILE__', tempTarget));
@@ -89,7 +112,7 @@ export async function fix(options: PrevisOptions, target: string) {
     }
     // save and screenshot
     await Deno.writeTextFile(tempTarget, newCode);
-    await ssbr.screenshot();
+    await ssbr?.screenshot();
     request = await options.getInput("Accept? [y/N/Prompt]");
     if (request === "y") {
       await Deno.rename(tempTarget, target);
@@ -101,7 +124,7 @@ export async function fix(options: PrevisOptions, target: string) {
     }
     code = newCode;
   }
-  await ssbr.end();
+  await ssbr?.end();
 }
 
 export async function test(options: PrevisOptions, target: string) {
@@ -123,34 +146,57 @@ export async function test(options: PrevisOptions, target: string) {
 }
 
 export async function generate(options: PrevisOptions, target: string) {
-  await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
-  const screenshot = await runScreenshotBrowser(options, target);
-  const vision = !!options.vision;
-  const printRaw = !!options.printRaw;
+  const uiMode = !target.endsWith(".ts");
 
-  const tempTarget = getTempFilepath(target);
-  await screenshot.screenshot();
-  // first time
-  const request = await options.getInput("What is this component?");
-  if (!request) return;
-  const newCode = await getNewCode({
-    target,
-    request,
-    printRaw,
-    vision,
-  });
-  await screenshot.screenshot();
-  await Deno.writeTextFile(tempTarget, newCode);
-  await printCode(target);
-  const accepted = await options.getConfirm("Accept？ [y/N]");
-  if (accepted) {
-    await Deno.rename(tempTarget, target);
-    return;
+  if (uiMode) {
+    await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
+    const screenshot = await runScreenshotBrowser(options, target);
+    const vision = !!options.vision;
+    const printRaw = !!options.printRaw;
+
+    const tempTarget = getTempFilepath(target);
+    await screenshot.screenshot();
+    // first time
+    const request = options.request ?? await options.getInput("What is this file?");
+    if (!request) return;
+    const newCode = await getNewComponent({
+      target,
+      request,
+      printRaw,
+      vision,
+    });
+    await screenshot.screenshot();
+    await Deno.writeTextFile(tempTarget, newCode);
+    await printCode(target);
+    const accepted = options.yes ?? await options.getConfirm("Accept？ [y/N]");
+    if (accepted) {
+      await Deno.rename(tempTarget, target);
+    } else {
+      await Deno.remove(tempTarget);
+    }
+    await screenshot.end();
+  } else {
+    // non-ui mode
+    await Deno.writeTextFile(target, 'export default function () {}');
+
+    const tempTarget = getTempFilepath(target);
+    // first time
+    const request = options.request ?? await options.getInput("What is this file?");
+    if (!request) return;
+    const newCode = await getNewFunction({
+      target,
+      request,
+      debug: !!options.debug,
+    });
+    await Deno.writeTextFile(tempTarget, newCode);
+    await printCode(target);
+    const accepted = options.yes ?? await options.getConfirm("Accept？ [y/N]");
+    if (accepted) {
+      await Deno.rename(tempTarget, target);
+    } else {
+      await Deno.remove(tempTarget);
+    }
   }
-  if (!accepted) {
-    await Deno.remove(tempTarget);
-  }
-  await screenshot.end();
 }
 
 export async function serve(options: PrevisOptions, target: string) {
