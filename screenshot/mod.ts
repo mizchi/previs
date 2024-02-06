@@ -1,28 +1,14 @@
 import { puppeteer } from '../deps.ts';
+import { pxToNumber } from "../utils.ts";
 
 const DEFAULT_WIDTH = 500;
 const DEFAULT_HEIGHT = 500;
 
-// const DEFAULT_DISPLAY_WIDTH = 500;
-// const DEFAULT_DISPLAY_HEIGHT = 500;
-
-function getDeviceScaleFactor(scale: number | 'auto' | undefined, rootSize: { width: number, height: number }) {
-  const isAutoScale = scale === 'auto' || !scale;
-  // 0 is a special case, it means the element is not visible
-  if (rootSize.width === 0) {
-    return 1;
-  }
-  const deviceScaleFactor = isAutoScale
-    ? DEFAULT_WIDTH / rootSize.width
-    : scale as number;
-  return Math.floor(100 * deviceScaleFactor) / 100;
-}
-
 export async function startBrowser(options: {
   screenshotPath: string,
   scale?: number | 'auto',
-  width?: number,
-  height?: number,
+  width?: string,
+  height?: string,
   displayWidth?: number,
   displayHeight?: number,
   debug?: boolean,
@@ -85,27 +71,66 @@ export async function startBrowser(options: {
       }
 
       const size = await this._getRootSize();
-      const deviceScaleFactor = getDeviceScaleFactor(options.scale, size);
-      if (options.debug) {
-        console.log('[ss:deviceScaleFactor]', deviceScaleFactor);
-      }
-      await page.setViewport({
-        width: options.width ?? DEFAULT_WIDTH,
-        height: options.height ?? DEFAULT_HEIGHT,
-        deviceScaleFactor,
-      });
+      const width = options.width ? pxToNumber(options.width) : DEFAULT_WIDTH;
+      const height = options.height ? pxToNumber(options.height) : DEFAULT_HEIGHT;
+      const explicitDisplayWidth = !!options.width;
 
-      await page.screenshot({
-        path: options.screenshotPath,
-        clip: {
-          x: 0,
-          y: 0,
-          width: size.width,
-          height: size.height,
+      if (explicitDisplayWidth) {
+        const finalWidth = Math.min(size.width, width);
+        const finalHeight = Math.min(size.height, height);
+        const deviceScaleFactor = getDeviceScaleFactor(options.scale, {
+          width: finalWidth,
+          height: finalHeight
+        });
+        await page.setViewport({
+          width: width ?? size.width,
+          height: height ?? size.height,
+          deviceScaleFactor: deviceScaleFactor
+        });
+        await page.screenshot({
+          path: options.screenshotPath,
+          clip: {
+            x: 0,
+            y: 0,
+            width: finalWidth,
+            height: finalHeight
+          }
+        });
+      } else {
+        const deviceScaleFactor = getDeviceScaleFactor(options.scale, size);
+        if (options.debug) {
+          console.log('[ss:deviceScaleFactor]', deviceScaleFactor);
         }
-      });
+        await page.setViewport({
+          width: width,
+          height: height,
+          deviceScaleFactor,
+        });
+        await page.screenshot({
+          path: options.screenshotPath,
+          clip: {
+            x: 0,
+            y: 0,
+            width: size.width,
+            height: size.height,
+          }
+        });
+      }
       await options.onScreenshot?.(url);
     },
     close: () => browser.close(),
   }
 }
+
+function getDeviceScaleFactor(scale: number | 'auto' | undefined, rootSize: { width: number, height: number }) {
+  const isAutoScale = scale === 'auto' || !scale;
+  // 0 is a special case, it means the element is not visible
+  if (rootSize.width === 0) {
+    return 1;
+  }
+  const deviceScaleFactor = isAutoScale
+    ? DEFAULT_WIDTH / rootSize.width
+    : scale as number;
+  return Math.floor(100 * deviceScaleFactor) / 100;
+}
+

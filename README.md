@@ -43,8 +43,11 @@ $ previs button.tsx
 # Fix with import (for tailwind and others)
 $ previs button.tsx --import style.css
 
-# Fix with image upload
+# Fix with image upload (CAUTION: many token used)
 $ previs button.tsx --vision
+
+# Preview with size
+$ previs button.tsx -w 400px
 
 # Generate new file
 $ previs newfile.tsx
@@ -103,10 +106,10 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
   - [x] previs
   - [x] previs gen
   - [x] previs fix
+  - [ ] previs fix --auto
   - [x] previs doctor
   - [x] previs ss
   - [x] previs test
-  - [ ] previs auto
   - [ ] previs gen-test
   - [ ] previs init
 - Integration
@@ -126,7 +129,7 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
 - [x] format
 - [ ] Load `previs.config.json`
 - [ ] Load specified vite.config by options
-- [ ] width/height on preview
+- [x] width/height
 - [x] show diff
 - [ ] Web UI
 - [ ] VRT

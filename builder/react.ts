@@ -4,18 +4,16 @@ import { getExportedComponent } from "../utils.ts";
 const ENTRY_FILE_NAME = "entry.preview.tsx";
 
 type CreateReactProjectOptions = {
-  width?: string;
-  height?: string;
   imports: string[];
   previewDir: string;
   filename: string;
 };
 
-export function buildReactProjectFiles({ width, height, imports, previewDir, filename }: CreateReactProjectOptions) {
+export function buildReactProjectFiles({ imports, previewDir, filename }: CreateReactProjectOptions) {
   const relativeImports = imports.map(s => relative(previewDir, s));
   const exportedName = getExportedComponent(filename);
   return {
-    'index.html': buildVirtualIndexHtml(width, height),
+    'index.html': buildVirtualIndexHtml(),
     'entry.preview.tsx': buildReactEntry(exportedName, relativeImports),
     'vite.config.mts': buildVanillaConfig(),
   };
@@ -32,7 +30,7 @@ export default defineConfig({
 `;
 }
 
-function buildVirtualIndexHtml(width: string | undefined, height: string | undefined) {
+function buildVirtualIndexHtml() {
   return `<!DOCTYPE html>
 <html lang="en">
 

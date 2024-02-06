@@ -12,8 +12,6 @@ type BuilderOption = {
   cwd: string;
   target: string;
   port: number;
-  width?: string;
-  height?: string;
   imports: string[]
 };
 
@@ -21,8 +19,6 @@ export async function startBuilder(options: BuilderOption) {
   const settings = await findProjectSettings(options.cwd);
   await initializeProject({
     ...settings,
-    width: options.width,
-    height: options.height,
     imports: options.imports,
   }, options.target);
   const server = await createServer({
@@ -138,8 +134,6 @@ async function findProjectSettings(cwd: string): Promise<ViteSettings> {
 
 export async function initializeProject(
   {
-    width,
-    height,
     imports,
     virtualRoot,
   }: InitVitePreviewProjectOption,
@@ -147,8 +141,6 @@ export async function initializeProject(
 ) {
   await Deno.mkdir(virtualRoot, { recursive: true }).catch(() => { });
   const files = buildReactProjectFiles({
-    width,
-    height,
     imports,
     filename: filename ?? "index.tsx",
     previewDir: virtualRoot,

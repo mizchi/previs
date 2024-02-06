@@ -223,3 +223,7 @@ Deno.test('getExportedComponent', () => {
   expect(getExportedComponent('/tmp/button.xxx.tsx')).toEqual('button');
   expect(getExportedComponent('/tmp/Button.tsx')).toEqual('button');
 });
+
+export function pxToNumber(str: string): number {
+  return Number(str.replace('px', ''));
+}

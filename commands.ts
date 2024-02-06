@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { startBuilder } from "./builder/mod.ts";
-import { join, $, exists } from "./deps.ts";
+import { join, $ } from "./deps.ts";
 import { getFixedCode, getNewCode, getRetryCode } from "./fixer/mod.ts";
 import { PrevisOptions } from "./options.ts";
 import { startBrowser } from "./screenshot/mod.ts";
-import { analyzeEnv, getTempFilepath } from "./utils.ts";
+import { analyzeEnv, getTempFilepath, pxToNumber } from "./utils.ts";
 
 const defaultPort = "3434";
 
@@ -25,7 +25,8 @@ export async function screenshot(options: PrevisOptions, target: string) {
   const ssbr = await runScreenshotBrowser(options, target);
   await ssbr.screenshot();
   if (await hasCmd("imgcat")) {
-    await $`imgcat ${ssbr.getScreenshotPath()}`;
+    const width = options.width ? pxToNumber(options.width) : 400;
+    await $`imgcat -W ${width}px ${ssbr.getScreenshotPath()}`;
   }
   await ssbr.end();
 }
@@ -164,8 +165,6 @@ async function runBuildServer(options: PrevisOptions, target: string) {
   const imports = options.import?.map(s => join(Deno.cwd(), s)) ?? []
   const port = Number(options.port || defaultPort);
   return await startBuilder({
-    width: options.width ?? "fit-content",
-    height: options.height ?? "fit-content",
     cwd: Deno.cwd(),
     target,
     imports,
@@ -185,10 +184,13 @@ async function runScreenshotBrowser(options: PrevisOptions, target: string) {
   await builder.ensureBuild();
   const onScreenshot = async () => {
     if (await hasCmd("imgcat")) {
-      await $`imgcat ${screenshotPath}`;
+      const width = options.width ? pxToNumber(options.width) : 400;
+      await $`imgcat -W ${width}px ${screenshotPath}`;
     }
   };
   const browser = await startBrowser({
+    width: options.width,
+    height: options.height,
     screenshotPath,
     onScreenshot,
     scale,
@@ -205,9 +207,9 @@ async function runScreenshotBrowser(options: PrevisOptions, target: string) {
       await browser.close();
     },
     screenshot: async () => {
-      await $`git --no-pager diff --no-index --color=always ${target} ${tempTarget}`.noThrow();
       await builder.ensureBuild();
       await browser.screenshot(screenshotUrl);
+      await $`git --no-pager diff --no-index --color=always ${target} ${tempTarget}`.noThrow();
     }
   }
 }
