@@ -1,4 +1,5 @@
 import { parseArgs } from "./deps.ts";
+import { AnalyzedEnv } from "./utils.ts";
 
 const argsOptions = {
   help: {
@@ -77,6 +78,7 @@ Serve:
 `;
 
 export type PrevisOptions = ReturnType<typeof getParsedArgs>['values'] & {
+  env: AnalyzedEnv;
   addHook: (fn: () => void) => void;
   exit: (code: number) => void;
   getInput: (message: string) => Promise<string | undefined>;

@@ -3,28 +3,80 @@ import { join, $, exists } from "./deps.ts";
 import { createFixer } from "./fixer/mod.ts";
 import { PrevisOptions } from "./options.ts";
 import { startBrowser } from "./screenshot/mod.ts";
+import { analyzeEnv } from "./utils.ts";
 
 const defaultPort = "3434";
 
 export async function doctor(_options: PrevisOptions) {
-  if (await hasCmd("code")) {
-    console.log("✅ code")
+  await checkInstalled('git', 'Please install git');
+  await checkInstalled('code', 'Please install vscode cli');
+  await checkInstalled('imgcat', 'Please install imgcat');
+  await checkInstalled('bat', 'Please install bat');
+
+  const { viteDir, cwd, tsconfig, isReactJsx, libraryMode, packageJson, base } = await analyzeEnv(Deno.cwd());
+  if (viteDir) {
+    console.log("✅ vite:", formatFilepath(viteDir.found));
   } else {
-    console.log("❌ code:", "Install vscode cli");
+    console.log("❌ vite:", "Project is not setup for vite");
   }
 
-  if (await hasCmd("imgcat")) {
-    console.log("✅ imgcat");
+  if (packageJson) {
+    console.log("✅ package.json:", formatFilepath(packageJson.found));
   } else {
-    console.log("❌ imgcat:", "Install imgcat");
+    console.log("❌ package.json", "Put package.json in the root of the project");
   }
 
-  if (await hasCmd("bat")) {
-    console.log("✅ bat");
-  } else {
-    console.log("❌ bat:", "Install bat");
+  // if (nodeModulesDir) {
+  //   console.log("✅ node_modules:", formatFilepath(nodeModulesDir.found));
+  // } else {
+  //   console.log("❌ node_modules:", "Install node_modules");
+  // }
+
+  // if (vscodeDir) {
+  //   console.log("✅ vscode settings:", formatFilepath(vscodeDir.found), '');
+  // }
+
+  if (tsconfig) {
+    console.log("✅ tsconfig.json:", formatFilepath(tsconfig.found));
   }
 
+  if (isReactJsx) {
+    console.log("✅ compilerOptions.jsx: react-jsx");
+  } else {
+    console.log("❌ compilerOptions.jsx is not react-jsx");
+  }
+
+  if (libraryMode) {
+    console.log("Library:", libraryMode);
+  }
+
+  console.log("Base:", formatFilepath(base));
+  return;
+
+  function formatFilepath(path: string) {
+    if (path === cwd) {
+      return './';
+    }
+    if (path.startsWith(cwd)) {
+      const out = path.replace(cwd + '/', './');
+      return out;
+    } else {
+      if (path.startsWith(Deno.env.get("HOME")!)) {
+        return path.replace(Deno.env.get("HOME")!, '~');
+      }
+      return path;
+    }
+  }
+
+  async function checkInstalled(command: string, failMessage: string) {
+    if (await hasCmd(command)) {
+      console.log(`✅ ${command}`);
+      return true;
+    } else {
+      console.log(`❌ ${command}:`, failMessage);
+      return false;
+    }
+  }
   // TODO: Check puppeteer
   // TODO: Check deno version
   // TODO: Check vite environment

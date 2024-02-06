@@ -1,6 +1,7 @@
 import { generate, fix, init, screenshot, serve, doctor } from "./commands.ts";
 import { join, $, exists } from "./deps.ts";
 import { help, getParsedArgs, PrevisOptions } from "./options.ts"
+import { analyzeEnv } from "./utils.ts";
 
 const options = getParsedArgs(Deno.args);
 // ==== process helper ====
@@ -98,10 +99,12 @@ try {
   // post cleanup
   addHook(() => cleanTempFiles(Deno.cwd()));
 
+  const env = analyzeEnv(Deno.cwd());
   const first = options.positionals[0];
 
   const newOptions: PrevisOptions = {
     ...options.values,
+    env,
     addHook,
     exit,
     getInput,
