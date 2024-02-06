@@ -1,5 +1,5 @@
 import { relative, join, exists, createServer, Plugin } from '../deps.ts';
-import { InitVitePreviewProjectOption, PreviewType, BuilderOption, ViteSettings } from "./types.ts";
+import { InitVitePreviewProjectOption, PreviewType, ViteSettings } from "./types.ts";
 import { buildReactProjectFiles } from "./react.ts";
 
 const PREVIS_ROOT = ".previs";
@@ -8,6 +8,15 @@ const TARGET_MARKER = "__TARGET__";
 const log = (...args: Array<unknown>) => console.log("[previs]", ...args);
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+type BuilderOption = {
+  cwd: string;
+  target: string;
+  port: number;
+  width?: string;
+  height?: string;
+  style: string[]
+};
+
 export async function startBuilder(options: BuilderOption) {
   const settings = await findProjectSettings(options.cwd);
   await initializeProject({
@@ -15,7 +24,7 @@ export async function startBuilder(options: BuilderOption) {
     width: options.width,
     height: options.height,
     style: options.style,
-  });
+  }, options.target);
   const server = await createServer({
     root: settings.virtualRoot,
     base: options.cwd,
@@ -127,17 +136,21 @@ async function findProjectSettings(cwd: string): Promise<ViteSettings> {
 //   return undefined;
 // }
 
-export async function initializeProject({
-  width,
-  height,
-  style,
-  virtualRoot,
-}: InitVitePreviewProjectOption) {
+export async function initializeProject(
+  {
+    width,
+    height,
+    style,
+    virtualRoot,
+  }: InitVitePreviewProjectOption,
+  filename?: string
+) {
   await Deno.mkdir(virtualRoot, { recursive: true }).catch(() => { });
   const files = buildReactProjectFiles({
     width,
     height,
     style,
+    filename: filename ?? "index.tsx",
     previewDir: virtualRoot,
   });
   for (const [filename, content] of Object.entries(files)) {

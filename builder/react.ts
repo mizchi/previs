@@ -1,13 +1,22 @@
 import { relative } from "../deps.ts";
-import { CreateReactProjectOptions } from "./types.ts";
+import { getExportedComponent } from "../utils.ts";
 
 const ENTRY_FILE_NAME = "entry.preview.tsx";
 
-export function buildReactProjectFiles({ width, height, style, previewDir }: CreateReactProjectOptions) {
-  const relativeStyles = style.map(s => relative(previewDir, s));
+type CreateReactProjectOptions = {
+  width?: string;
+  height?: string;
+  style: string[];
+  previewDir: string;
+  filename: string;
+};
+
+export function buildReactProjectFiles({ width, height, style, previewDir, filename }: CreateReactProjectOptions) {
+  const relativeImports = style.map(s => relative(previewDir, s));
+  const exportedName = getExportedComponent(filename);
   return {
     'index.html': buildVirtualIndexHtml(width, height),
-    'entry.preview.tsx': buildReactEntry('', relativeStyles),
+    'entry.preview.tsx': buildReactEntry(exportedName, relativeImports),
     'vite.config.mts': buildVanillaConfig(),
   };
 }
@@ -49,18 +58,24 @@ function buildVirtualIndexHtml(width: string | undefined, height: string | undef
 `;
 }
 
-function buildReactEntry(filename: string, relativeStyles: string[]) {
-  const styleIntro = relativeStyles.map(s => `import '${s}';`).join('\n');
+function buildReactEntry(filename: string, relativeImports: string[]) {
+  const pre = relativeImports.map(s => `import '${s}';`).join('\n');
   return `// generated
-${styleIntro}
+${pre}
 import { createRoot } from 'react-dom/client';
 // @ts-ignore
 import * as Target from "/__TARGET__";
 const root = document.getElementById('root');
 
 // select entry
-const Component = Target.__PREVIEW__ ?? Target['${filename}'] ?? Target.default;
-createRoot(root).render(<Component />);
+const fileNamedKey = Object.keys(Target).find(key => key.toLowerCase() === '${filename}');
+const Component = Target.__PREVIEW__ ?? Target[fileNamedKey] ?? Target.default;
+
+try {
+  createRoot(root).render(<Component />);
+} catch (err) {
+  globalThis.__error__ = err;
+}
 `;
 };
 

@@ -80,11 +80,12 @@ $ previs button.tsx -- pnpm vitest --run
 ## TODO
 
 - Commands
-  - [x] previs (serve)
-  - [x] previs ss (screenshot)
-  - [x] previs create
+  - [x] previs
+  - [x] previs ss
+  - [x] previs gen
   - [x] previs fix
   - [x] previs doctor
+  - [ ] previs init
 - Integration
   - [x] react
   - [ ] svelte
@@ -94,21 +95,21 @@ $ previs button.tsx -- pnpm vitest --run
   - [ ] astro
   - [ ] htmx
 - Auto Detection
-  - [ ] UI library auto detection
-  - [ ] tailwind auto detection
-  - [ ] pandacss auto detection
-  - [ ] file named component detection
+  - [x] UI library auto detection
+  - [x] tailwind auto detection
+  - [x] file named component detection
+  - [ ] pandacss
 - [x] load tailwind config
 - [x] format
-- [ ] previs.config.json
-- [x] width/height on preview
-- [x] show diff
-- [ ] single binary
-- [ ] Fix retry
+- [ ] Load `previs.config.json`
+- [ ] width/height on preview
+- [ ] show diff
 - [ ] Web UI
 - [ ] test checker
 - [ ] --import option
 - [ ] VRT
+- Node package
+  - [ ] @previs/helper
 
 ## LICENSE
 

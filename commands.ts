@@ -1,24 +1,24 @@
 import { readFile } from 'node:fs/promises';
-import { initializeProject, startBuilder } from "./builder/mod.ts";
+import { startBuilder } from "./builder/mod.ts";
 import { join, $, exists } from "./deps.ts";
 import { getFixedCode, getNewCode, getRetryCode } from "./fixer/mod.ts";
 import { PrevisOptions } from "./options.ts";
 import { startBrowser } from "./screenshot/mod.ts";
 import { analyzeEnv, getTempFilepath } from "./utils.ts";
-import { env } from "node:process";
 
 const defaultPort = "3434";
 
-export async function init(options: PrevisOptions) {
-  const virtualRoot = join(Deno.cwd(), ".previs");
-  await initializeProject({
-    width: options.width ?? "fit-content",
-    height: options.height ?? "fit-content",
-    preExists: false,
-    virtualRoot,
-    viteBase: Deno.cwd(),
-    style: options.style?.map(s => join(Deno.cwd(), s)) ?? []
-  });
+export async function init(_options: PrevisOptions) {
+  throw new Error("Not implemented");
+  // const virtualRoot = join(Deno.cwd(), ".previs");
+  // await initializeProject({
+  //   width: options.width ?? "fit-content",
+  //   height: options.height ?? "fit-content",
+  //   preExists: false,
+  //   virtualRoot,
+  //   viteBase: Deno.cwd(),
+  //   style: options.style?.map(s => join(Deno.cwd(), s)) ?? []
+  // });
 }
 
 export async function screenshot(options: PrevisOptions, target: string) {
@@ -32,7 +32,6 @@ export async function screenshot(options: PrevisOptions, target: string) {
 
 export async function fix(options: PrevisOptions, target: string) {
   const vision = !!options.vision;
-  // create temp file
   const tempTarget = getTempFilepath(target);
   await Deno.copyFile(target, tempTarget);
 
@@ -67,7 +66,6 @@ export async function fix(options: PrevisOptions, target: string) {
         debug: options.debug,
         getImage: () => ssbr.getImage(),
       });
-
     if (options.testCommand) {
       const [cmd, ...args] = options.testCommand;
       const testResult = await $`${cmd} ${args}`.noThrow();
