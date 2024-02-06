@@ -37,9 +37,14 @@ Base: ./
 ```
 
 ```bash
+# Fix
 $ previs button.tsx
-# with stylesheet (for tailwind and others)
+
+# Fix with import (for tailwind and others)
 $ previs button.tsx --import style.css
+
+# Generate new file
+$ previs newfile.tsx
 ```
 
 ### Preview Convensions
@@ -49,10 +54,11 @@ Put single file for preview in vite project.
 - exported `__PREVIEW__`
 - exported `default`
 
-Example.
+Examples.
+
+Default
 
 ```tsx
-// default or filename(caseless) component
 export default function Button() {
   const buttonStyle = {
     backgroundColor: 'red',
@@ -60,15 +66,24 @@ export default function Button() {
   };
   return <button type="button" style={buttonStyle}>Click me</button>
 }
-// export { Button }
+```
 
-// Prefer __PREVIEW__
-export const __PREVIEW__ = () => {
-  return <div>
-    <Button />
-  </div>
+Same filename (caseless)
+
+```tsx
+// Button.tsx
+export function Button() {
+  return <button type="button" style={buttonStyle}>Click me</button>
 }
 ```
+
+```tsx
+// __PREVIEW__: best priority.
+export function __PREVIEW__() {
+  return <>...</>
+}
+```
+
 
 ### Run with test
 
@@ -76,6 +91,8 @@ export const __PREVIEW__ = () => {
 # run after -- command before code accept and retry.
 $ previs button.tsx -- pnpm vitest --run __FILE__
 ```
+
+`__FILE__` is replaced to generated temp file. (eg. `button.__previes.tsx`)
 
 ## TODO
 
@@ -86,6 +103,7 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
   - [x] previs doctor
   - [x] previs ss
   - [x] previs test
+  - [ ] previs auto
   - [ ] previs gen-test
   - [ ] previs init
 - Integration
@@ -100,14 +118,16 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
   - [x] UI library auto detection
   - [x] tailwind auto detection
   - [x] file named component detection
-  - [ ] pandacss
+  - [ ] panda-css
 - [x] load tailwind config
 - [x] format
 - [ ] Load `previs.config.json`
+- [ ] Load specified vite.config by options
 - [ ] width/height on preview
 - [ ] show diff
 - [ ] Web UI
 - [ ] VRT
+- [ ] testing library sample
 - Node package
   - [ ] @previs/helper
 
