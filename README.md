@@ -99,6 +99,7 @@ $ previs ss button.tsx
 - [ ] Vitest
 - [ ] --import option
 - [ ] VRT
+- [ ] Change 
 
 ## LICENSE
 

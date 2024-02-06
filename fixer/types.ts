@@ -1,6 +1,5 @@
-export type ChatMessage = {
-  role: 'system' | 'user',
-  content: string | Array<{
+export type ChatContent =
+  {
     type: "text",
     text: string
   } | {
@@ -8,5 +7,10 @@ export type ChatMessage = {
     image_url: {
       url: string
     }
-  }>
+  };
+export type ChatMessage = {
+  role: 'system' | 'user',
+  content:
+  | string
+  | ChatContent[]
 };

@@ -1,110 +1,92 @@
-import React, { useState, FormEvent } from "react";
+import React, { useState } from "react";
 
-interface FormProps {
-  onSubmit: (data: { [key: string]: any }) => void;
-}
+export default function SimpleForm() {
+  // Using useState to handle form field values
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    message: "",
+  });
 
-export default function Form({ onSubmit }: FormProps) {
-  const [formData, setFormData] = useState<{ [key: string]: any }>({});
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle form field changes and update the state
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((prevState) => ({ ...prevState, [name]: value }));
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    // In a real-world app, you would typically handle the form submission here
+    console.log("Form Data Submitted:", formData);
   };
 
-  // Changed divs to flex flex-col for vertical alignment
   return (
-    <form className="flex flex-col space-y-6" onSubmit={handleSubmit}>
-      {/* First Name form field */}
-      <div className="flex flex-col items-start">
-        {" "}
-        {/* Changed from flex items-center to flex flex-col items-start */}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div>
         <label
-          htmlFor="firstName"
-          className="text-sm font-medium text-gray-700"
+          htmlFor="name"
+          className="block text-sm font-medium text-gray-700"
         >
-          First Name {/* Removed block class for label */}
+          Name
         </label>
         <input
           type="text"
-          name="firstName"
-          id="firstName"
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          id="name"
+          name="name"
+          value={formData.name}
           onChange={handleChange}
+          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          placeholder="Your name"
         />
       </div>
-      {/* Family Name form field */}
-      <div className="flex flex-col items-start">
-        {" "}
-        {/* Changed from flex items-center to flex flex-col items-start */}
+      <div>
         <label
-          htmlFor="familyName"
-          className="text-sm font-medium text-gray-700"
+          htmlFor="email"
+          className="block text-sm font-medium text-gray-700"
         >
-          Family Name {/* Removed block class for label */}
-        </label>
-        <input
-          type="text"
-          name="familyName"
-          id="familyName"
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          onChange={handleChange}
-        />
-      </div>
-      {/* Age form field */}
-      <div className="flex flex-col items-start">
-        {" "}
-        {/* Changed from flex items-center to flex flex-col items-start */}
-        <label htmlFor="age" className="text-sm font-medium text-gray-700">
-          Age {/* Removed block class for label */}
-        </label>
-        <input
-          type="number"
-          name="age"
-          id="age"
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          onChange={handleChange}
-        />
-      </div>
-      {/* Email form field */}
-      <div className="flex flex-col items-start">
-        {" "}
-        {/* Changed from flex items-center to flex flex-col items-start */}
-        <label htmlFor="email" className="text-sm font-medium text-gray-700">
-          Email {/* Removed block class for label */}
+          Email address
         </label>
         <input
           type="email"
-          name="email"
           id="email"
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          name="email"
+          value={formData.email}
           onChange={handleChange}
+          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          placeholder="you@example.com"
         />
       </div>
-      {/* Changed div to align items to the end and to make it a column */}
-      <div className="self-end mt-6">
-        {" "}
-        {/* Edited to align the button to the bottom-right of the form */}
-        <button
-          type="submit"
-          className="py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+      <div>
+        <label
+          htmlFor="message"
+          className="block text-sm font-medium text-gray-700"
         >
-          Submit
-        </button>
+          Message
+        </label>
+        <textarea
+          id="message"
+          name="message"
+          value={formData.message}
+          onChange={handleChange}
+          rows={4}
+          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          placeholder="Your message"
+        ></textarea>
       </div>
+      <button
+        type="submit"
+        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+      >
+        Send
+      </button>
     </form>
   );
 }
 
+// __PREVIEW__ component for checking without props
 export function __PREVIEW__() {
-  const handleSubmit = (formData: { [key: string]: any }) => {
-    console.log(formData);
-  };
-
-  return <Form onSubmit={handleSubmit} />;
+  return <SimpleForm />;
 }

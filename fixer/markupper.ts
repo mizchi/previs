@@ -1,6 +1,8 @@
+import { readFile } from 'node:fs/promises';
+import { ChatContent, ChatMessage } from './types.ts';
 // import { ChatMessage } from "./types.ts";
 
-const INTRO = `You are CSS specialist. You write typescript-jsx(tsx) code.`
+const INTRO = 'You are CSS specialist. You write typescript-jsx(tsx) code.';
 
 const MARKUP_RULES = `## Rules
 
@@ -50,7 +52,7 @@ export function buildMarkupper() {
     create(opts: {
       filename: string,
       request: string,
-    }) {
+    }): ChatMessage[] {
       // WIP
       const { filename, request } = opts;
       return [
@@ -78,29 +80,52 @@ Please write a new code for ${filename}!`,
       request: string,
       oldPrompt?: string,
       imageUrl?: string,
-    }) {
+    }): ChatMessage[] {
       const { code, test, request, oldPrompt, imageUrl } = opts;
-      const fixContent = buildFixRequest(code, request, test, oldPrompt);
+      const fixingContent = buildFixRequest(code, request, test, oldPrompt);
       return [
         {
           role: 'system',
           content: MARKUP_FIX_PROMPT,
         },
+        // {
+        //   role: 'user',
+        //   content: imageUrl ? withImage(fixingContent, imageUrl) : fixingContent,
+        // },
         {
           role: 'user',
-          content: imageUrl ? withImage(fixContent, imageUrl) : fixContent,
+          content: [
+            {
+              type: "image",
+              image_url: {
+                url: `data:image/jpeg;base64,${imageUrl}`
+              }
+            },
+            {
+              type: "text",
+              text: fixingContent,
+            },
+
+          ]
         }
+
       ]
     },
     retryWith(opts: {
       code: string,
       request: string,
       failReason: string,
-      test: string,
+      test?: string,
       lastPrompt?: string,
       imageUrl?: string,
     }) {
-      const retryContent = buildRetryRequest(opts.code, opts.request, opts.test!, opts.failReason, opts.lastPrompt);
+      const retryContent = buildRetryRequest(
+        opts.code,
+        opts.request,
+        opts.test,
+        opts.failReason,
+        opts.lastPrompt
+      );
       return [{
         role: 'system',
         content: MARKUP_FIX_PROMPT,
@@ -114,7 +139,12 @@ Please write a new code for ${filename}!`,
   }
 }
 
-function buildFixRequest(code: string, request: string, test?: string, oldPrompt?: string) {
+function buildFixRequest(
+  code: string,
+  request: string,
+  test?: string,
+  oldPrompt?: string
+) {
   return `## Code
 
 \`\`\`tsx
@@ -135,7 +165,7 @@ Let's fix the code!
 function buildRetryRequest(
   code: string,
   request: string,
-  test: string,
+  test: string | undefined,
   failReason: string,
   oldPrompt?: string
 ) {
@@ -163,16 +193,17 @@ Let's try again!
 }
 
 // consider image request
-function withImage(message: string, b64image: string) {
+function withImage(message: string, b64image: string): Array<ChatContent> {
   return [
-    {
-      type: "text",
-      text: message
-    },
     {
       type: "image",
       image_url: {
         url: `data:image/jpeg;base64,${b64image}`
       }
-    }]
+    },
+    {
+      type: "text" as const,
+      text: `Given image is preview result.\n${message}`
+    },
+  ]
 }

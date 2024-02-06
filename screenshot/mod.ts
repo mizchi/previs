@@ -9,6 +9,11 @@ const DEFAULT_DISPLAY_HEIGHT = 500;
 function getDeviceScaleFactor(scale: number | 'auto' | undefined, rootSize: { width: number, height: number }) {
   // return scale === 'auto' ? DEFAULT_WIDTH : scale;
   const isAutoScale = scale === 'auto' || !scale;
+
+  // 0 is a special case, it means the element is not visible
+  if (rootSize.width === 0) {
+    return 1;
+  }
   const deviceScaleFactor = isAutoScale
     ? DEFAULT_WIDTH / rootSize.width
     : scale as number;
@@ -71,7 +76,6 @@ export async function startBrowser(options: {
           height: size.height,
         }
       });
-      // await $`imgcat ${ssOutpath}`;
       await options.onScreenshot?.(url);
     },
     close: () => browser.close(),

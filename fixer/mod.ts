@@ -1,15 +1,16 @@
+import { ChatMessage } from './types.ts';
 export { buildMarkupper } from './markupper.ts';
 
 import { readFile } from 'node:fs/promises';
 import { $, extname, exists } from '../deps.ts';
-import { requestRefinedCode } from "./request.ts";
+import { requestNewCode, selectModel } from "./request.ts";
 import { buildMarkupper } from "./markupper.ts";
 
 const MAX_RETRY = 3;
 
 type FixerOptions = {
   target: string;
-  useImageModel: boolean;
+  vision: boolean;
   screenshotPath: string;
   printRaw: boolean;
   action?: (code: string) => Promise<void>;
@@ -17,7 +18,7 @@ type FixerOptions = {
 
 export function createFixer(options: FixerOptions) {
   const markupper = buildMarkupper();
-  const backupName = options.target + '.bk';
+  const backupName = `${options.target}.bk`;
   return {
     create,
     fix,
@@ -29,10 +30,13 @@ export function createFixer(options: FixerOptions) {
     const messages = markupper.create({
       filename, request,
     });
-    const newCode = await requestRefinedCode({
-      image: options.useImageModel,
+
+    const model = selectModel({ vision: options.vision });
+    const newCode = await requestNewCode({
+      model,
+      vision: options.vision,
       printRaw: options.printRaw,
-      messages: messages as any,
+      messages: messages as ChatMessage[],
     });
     return newCode;
   }
@@ -40,17 +44,27 @@ export function createFixer(options: FixerOptions) {
   async function fix(code: string, request: string, oldPrompt?: string) {
     const testFilepath = await getTestFileName(options.target);
     const test = testFilepath ? Deno.readTextFileSync(testFilepath) : undefined;
+
+    // const b64image = options.vision ? await readFile(options.screenshotPath, 'base64') : undefined;
+    // console.log("b64image", b64image?.length);
+
+    const b64image = await readFile(new URL("../ss.png", import.meta.url)).then((buf) => buf.toString("base64"));
+
+    // const b64image = await readFile('../ss.png', 'base64');
     const messages = markupper.fix({
       code,
       test: test,
       request: request,
       oldPrompt,
-      imageUrl: options.useImageModel ? `data:image/jpeg;base64,${await readFile(options.screenshotPath, 'base64')}` : undefined,
+      imageUrl: options.vision
+        ? b64image
+        : undefined,
     });
-    let outputCode = await requestRefinedCode({
-      image: options.useImageModel,
+    let outputCode = await requestNewCode({
+      model: selectModel({ vision: options.vision }),
+      vision: options.vision,
       printRaw: options.printRaw,
-      messages: messages as any,
+      messages: messages as ChatMessage[],
     });
     await updateWithBackup(outputCode);
     // run test if exists
@@ -70,12 +84,12 @@ export function createFixer(options: FixerOptions) {
           code: outputCode,
           request: request,
           failReason: failMessage,
-          test: test!,
+          test: test,
           lastPrompt: request,
         });
-        outputCode = await requestRefinedCode({
-          image: options.useImageModel,
-          messages: messages as any,
+        outputCode = await requestNewCode({
+          vision: options.vision,
+          messages: messages as ChatMessage[],
         });
       }
       if (!passed) {
@@ -95,7 +109,7 @@ export function createFixer(options: FixerOptions) {
       return;
     }
     // retry
-    await fix(outputCode, response!, request);
+    await fix(outputCode, response, request);
   }
 
   function hookSignal() {
@@ -127,7 +141,7 @@ export function createFixer(options: FixerOptions) {
   }
 }
 
-async function getTestFileName(target: string): Promise<string | void> {
+async function getTestFileName(target: string): Promise<string | undefined> {
   const ext = extname(target);
   const testFile = target.replace(ext, `.test${ext}`);
   if (await exists(testFile)) {

@@ -1,4 +1,4 @@
-import { join, parseArgs, $, exists } from "./deps.ts";
+import { join, parseArgs, $, exists, type ParseArgsConfig } from "./deps.ts";
 import { startBuilder, initializeProject } from "./builder/mod.ts";
 import { startBrowser } from "./screenshot/mod.ts";
 import { createFixer } from "./fixer/mod.ts";
@@ -6,60 +6,109 @@ import { createFixer } from "./fixer/mod.ts";
 const defaultPort = "3434"
 
 // TODO: separte init and run options
+const parseArgsOptions = {
+  help: {
+    type: "boolean",
+    short: "h",
+  },
+  vision: {
+    type: "boolean",
+  },
+  request: {
+    type: "string",
+    short: "r",
+  },
+  debug: {
+    type: "boolean",
+    short: "d",
+  },
+  scale: {
+    type: "string",
+  },
+  width: {
+    type: "string",
+    short: "w",
+  },
+  height: {
+    type: "string",
+    short: "h",
+  },
+  queue: {
+    type: "string",
+    short: "q",
+  },
+  force: {
+    type: "boolean",
+    short: "f",
+    default: false,
+  },
+  style: {
+    type: 'string',
+    short: 's',
+    multiple: true,
+  },
+  printRaw: {
+    type: 'boolean',
+    short: 'r',
+  },
+  port: {
+    type: "string",
+    short: "p",
+    default: defaultPort,
+  },
+} as const;
+
+const previsCommandIntro = `usage:
+$ previs [options] <target-file>
+
+Examples:
+  # fix existed file
+  $ previs button.tsx
+
+  # fix existed file with css (like tailwindcss)
+  $ previs src/button.tsx --style src/image.css
+
+  # generate new file
+  $ previs src/button.tsx --input "This is button component"
+
+These are common Previs commands used in various situations:
+
+Doctor: checking environment
+  $ previs doctor
+
+Screenshot:
+  $ previs ss [options] <target>
+
+Serve:
+  $ previs serve [options] <target>
+`;
+
+function printHelp(options: NonNullable<ParseArgsConfig['options']>) {
+  let help = previsCommandIntro;
+  const keys = Object.keys(options);
+  for (const key of keys) {
+    const option = options[key];
+    const type = option.type;
+    const short = option.short;
+    const defaultValue = option.default;
+    help += `-${short}, --${key} <${type}>${defaultValue ? ` (default: ${defaultValue})` : ""}\n`;
+  }
+  console.log(help);
+}
+
 const options = parseArgs({
   args: Deno.args,
-  options: {
-    request: {
-      type: "string",
-      short: "r",
-    },
-    debug: {
-      type: "boolean",
-      short: "d",
-    },
-    scale: {
-      type: "string",
-    },
-    width: {
-      type: "string",
-      short: "w",
-    },
-    height: {
-      type: "string",
-      short: "h",
-    },
-    ignore: {
-      type: "boolean",
-      short: "i",
-    },
-    force: {
-      type: "boolean",
-      short: "f",
-      default: false,
-    },
-    style: {
-      type: 'string',
-      short: 's',
-      multiple: true,
-    },
-    printRaw: {
-      type: 'boolean',
-      short: 'r',
-    },
-    useVision: {
-      type: "boolean",
-      short: "i",
-    },
-    port: {
-      type: "string",
-      short: "p",
-      default: defaultPort,
-    }
-  },
+  options: parseArgsOptions,
   allowPositionals: true,
 });
 
+const inputQueue = options.values.queue ? options.values.queue.split(",").map(s => s.trim()) : undefined;
 const first = options.positionals[0];
+
+if (options.values.help) {
+  printHelp(parseArgsOptions);
+  Deno.exit(0);
+}
 
 switch (first) {
   case "init": {
@@ -97,7 +146,7 @@ switch (first) {
       Deno.exit(1);
     }
     const target = join(Deno.cwd(), second);
-    const useImageModel = false;
+    const vision = !!options.values.vision;
     const printRaw = !!options.values.printRaw;
 
     const ssbr = await runScreenshotBrowser(target);
@@ -105,7 +154,7 @@ switch (first) {
 
     const disposeFixer = await runFixer({
       target,
-      useImageModel,
+      vision,
       printRaw,
       screenshotPath: ssbr.getScreenshotPath(),
       action: ssbr.screenshot
@@ -124,11 +173,12 @@ switch (first) {
     const target = join(Deno.cwd(), second);
     await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
     const screenshot = await runScreenshotBrowser(target);
-    const useImageModel = false;
+    const vision = !!options.values.vision;
     const printRaw = !!options.values.printRaw;
+
     const fixer = createFixer({
       target,
-      useImageModel,
+      vision,
       screenshotPath: screenshot.getScreenshotPath(),
       printRaw,
       action: screenshot.screenshot
@@ -136,15 +186,14 @@ switch (first) {
     fixer.hookSignal();
 
     // first time
-    const request = options.values.request ?? await $.prompt("What is this component?");
+    const request = await getInput("What is this component?");
     if (!request) break;
 
     const newCode = await fixer.create(target, request);
     await Deno.writeTextFile(target, newCode);
 
     await printCode(target);
-
-    const accepted = await $.confirm("Accept？ [y/N]");
+    const accepted = await getConfirm("Accept？ [y/N]");
     if (!accepted) {
       await Deno.remove(target);
       break;
@@ -155,7 +204,6 @@ switch (first) {
     await screenshot.end();
     break;
   }
-
   default: {
     const target = join(Deno.cwd(), first);
     const builder = await runBuildServer(target);
@@ -237,14 +285,14 @@ async function printCode(target: string) {
 
 async function runFixer(opts: {
   target: string,
-  useImageModel: boolean,
+  vision: boolean,
   printRaw: boolean,
   screenshotPath: string,
   action: () => Promise<void>,
 }) {
   const fixer = createFixer({
     target: opts.target,
-    useImageModel: opts.useImageModel,
+    vision: opts.vision,
     screenshotPath: opts.screenshotPath,
     printRaw: opts.printRaw,
     action: opts.action
@@ -252,7 +300,7 @@ async function runFixer(opts: {
   fixer.hookSignal();
 
   // first time
-  const request = options.values.request ?? await $.prompt("What do you want to fix?");
+  const request = await getInput("What do you want to fix?");
   if (request) {
     const content = await Deno.readTextFile(opts.target);
     await fixer.fix(content, request);
@@ -260,4 +308,18 @@ async function runFixer(opts: {
   return () => {
     fixer.cleanup();
   }
+}
+
+// mock prompt for manual debug
+async function getInput(message: string): Promise<string | undefined> {
+  if (Array.isArray(inputQueue)) return inputQueue.shift();
+  return await $.prompt(message);
+}
+
+async function getConfirm(message: string): Promise<boolean> {
+  if (Array.isArray(inputQueue)) {
+    const next = inputQueue.shift();
+    return next === "y";
+  }
+  return await $.confirm(message);
 }
