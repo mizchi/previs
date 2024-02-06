@@ -43,6 +43,9 @@ $ previs button.tsx
 # Fix with import (for tailwind and others)
 $ previs button.tsx --import style.css
 
+# Fix with image upload
+$ previs button.tsx --vision
+
 # Generate new file
 $ previs newfile.tsx
 ```
@@ -124,7 +127,7 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
 - [ ] Load `previs.config.json`
 - [ ] Load specified vite.config by options
 - [ ] width/height on preview
-- [ ] show diff
+- [x] show diff
 - [ ] Web UI
 - [ ] VRT
 - [ ] testing library sample

@@ -35,7 +35,7 @@ export async function fix(options: PrevisOptions, target: string) {
   const tempTarget = getTempFilepath(target);
   await Deno.copyFile(target, tempTarget);
 
-  const ssbr = await runScreenshotBrowser(options, tempTarget);
+  const ssbr = await runScreenshotBrowser(options, target);
   await ssbr.screenshot();
 
   if (options.testCommand) {
@@ -174,8 +174,8 @@ async function runBuildServer(options: PrevisOptions, target: string) {
 }
 
 async function runScreenshotBrowser(options: PrevisOptions, target: string) {
-  const builder = await runBuildServer(options, target);
   const tempTarget = getTempFilepath(target);
+  const builder = await runBuildServer(options, tempTarget);
   options.addHook(() => builder.end());
   const scale = options.scale ?? typeof options.scale === "string" ? Number(options.scale) : undefined;
   const tmpdir = Deno.makeTempDirSync();
@@ -205,26 +205,18 @@ async function runScreenshotBrowser(options: PrevisOptions, target: string) {
       await browser.close();
     },
     screenshot: async () => {
+      await $`git --no-pager diff --no-index --color=always ${target} ${tempTarget}`.noThrow();
       await builder.ensureBuild();
       await browser.screenshot(screenshotUrl);
-      if (await hasCmd("bat")) {
-        if (await exists(target) && await exists(tempTarget)) {
-          await $`git --no-pager diff --no-index --color=always ${tempTarget} ${target}`.noThrow();
-        } else {
-          await $`bat --language=tsx --style=grid --paging=never ${target}`;
-        }
-      } else {
-        await $`cat ${target}`;
-      }
     }
   }
 }
 
 export async function doctor(_options: PrevisOptions) {
   await checkInstalled('git', 'Please install git');
-  await checkInstalled('code', 'Please install vscode cli');
-  await checkInstalled('imgcat', 'Please install imgcat');
-  await checkInstalled('bat', 'Please install bat');
+  await checkInstalled('code', 'Please install vscode cli. https://code.visualstudio.com/docs/editor/command-line');
+  await checkInstalled('imgcat', 'Please install imgcat.\nDownload https://iterm2.com/utilities/imgcat and chmod +x in PATH');
+  await checkInstalled('bat', 'Please install bat. https://github.com/sharkdp/bat');
 
   const apiKey = Deno.env.get("OPENAI_API_KEY") ?? Deno.env.get("PREVIS_OPENAI_API_KEY")
   if (apiKey) {
