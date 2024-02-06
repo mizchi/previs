@@ -59,10 +59,9 @@ Put single file for preview in vite project.
 
 - exported `__PREVIEW__`
 - exported `default`
+- Same symbol of filename(caseless)
 
 Examples.
-
-Default
 
 ```tsx
 export default function Button() {
@@ -83,6 +82,8 @@ export function Button() {
 }
 ```
 
+`__PREVIEW__`
+
 ```tsx
 // __PREVIEW__: best priority.
 export function __PREVIEW__() {
@@ -98,7 +99,7 @@ export function __PREVIEW__() {
 $ previs button.tsx -- pnpm vitest --run __FILE__
 ```
 
-`__FILE__` is replaced to generated temp file. (eg. `button.__previes.tsx`)
+`__FILE__` is replaced to generated temp file. (eg. `button.__previs__.tsx`)
 
 ## TODO
 
