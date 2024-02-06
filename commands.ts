@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { initializeProject, startBuilder } from "./builder/mod.ts";
 import { join, $, exists } from "./deps.ts";
-import { getFixedCode, getNewCode } from "./fixer/mod.ts";
+import { getFixedCode, getNewCode, getRetryCode } from "./fixer/mod.ts";
 import { PrevisOptions } from "./options.ts";
 import { startBrowser } from "./screenshot/mod.ts";
 import { analyzeEnv, getTempFilepath } from "./utils.ts";
+import { env } from "node:process";
 
 const defaultPort = "3434";
 
@@ -39,18 +40,49 @@ export async function fix(options: PrevisOptions, target: string) {
   await ssbr.screenshot();
 
   let request = await options.getInput("How to fix?");
+  if (!request) {
+    await ssbr.end();
+    await Deno.remove(tempTarget);
+    return;
+  };
   let code = await Deno.readTextFile(tempTarget);
+  let failedReason: string | undefined = undefined;
 
   if (!request) return;
   while (true) {
-    const newCode = await getFixedCode({
-      code,
-      vision,
-      request: request!,
-      debug: options.debug,
-      getImage: () => ssbr.getImage(),
-    });
+    const newCode = failedReason
+      ? await getRetryCode({
+        code,
+        vision,
+        request: request!,
+        failedReason,
+        testCommand: options.testCommand!,
+        debug: options.debug,
+        getImage: () => ssbr.getImage(),
+      })
+      : await getFixedCode({
+        code,
+        vision,
+        request: request!,
+        debug: options.debug,
+        getImage: () => ssbr.getImage(),
+      });
 
+    if (options.testCommand) {
+      const [cmd, ...args] = options.testCommand;
+      const testResult = await $`${cmd} ${args}`.noThrow();
+      if (testResult.code === 0) {
+        console.log("[previs] test passed");
+        failedReason = undefined;
+      } else {
+        // test failed
+        console.log("[previs] test failed");
+        failedReason = testResult.stderr;
+        code = newCode;
+        continue;
+        // TODO: retry
+      }
+    }
     // save and screenshot
     await Deno.writeTextFile(tempTarget, newCode);
     await ssbr.screenshot();
@@ -172,6 +204,13 @@ export async function doctor(_options: PrevisOptions) {
   await checkInstalled('code', 'Please install vscode cli');
   await checkInstalled('imgcat', 'Please install imgcat');
   await checkInstalled('bat', 'Please install bat');
+
+  const apiKey = Deno.env.get("OPENAI_API_KEY") ?? Deno.env.get("PREVIS_OPENAI_API_KEY")
+  if (apiKey) {
+    console.log("✅ PREVIS_OPENAI_API_KEY is set");
+  } else {
+    console.log("❌ PREVIS_OPENAI_API_KEY is not set. Please set it in .env or environment variable");
+  }
 
   const { viteDir, cwd, tsconfig, isReactJsx, libraryMode, packageJson, base } = await analyzeEnv(Deno.cwd());
   if (viteDir) {

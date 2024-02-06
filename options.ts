@@ -79,6 +79,7 @@ Serve:
 
 export type PrevisOptions = ReturnType<typeof getParsedArgs>['values'] & {
   env: AnalyzedEnv;
+  testCommand?: string[];
   addHook: (fn: () => void) => void;
   exit: (code: number) => void;
   getInput: (message: string) => Promise<string | undefined>;
@@ -86,11 +87,27 @@ export type PrevisOptions = ReturnType<typeof getParsedArgs>['values'] & {
 };
 
 export function getParsedArgs(args: string[]) {
-  return parseArgs({
-    args,
-    options: argsOptions,
-    allowPositionals: true,
-  });
+  const splitIndex = args.indexOf("--");
+  if (splitIndex === -1) {
+    const parsed = parseArgs({
+      args: args,
+      options: argsOptions,
+      allowPositionals: true,
+    });
+    return {
+      ...parsed,
+      testCommand: undefined,
+    }
+  } else {
+    return {
+      ...parseArgs({
+        args: args.slice(0, splitIndex),
+        options: argsOptions,
+        allowPositionals: true,
+      }),
+      testCommand: args.slice(splitIndex + 1),
+    };
+  }
 }
 
 export function help() {

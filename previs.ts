@@ -121,6 +121,7 @@ try {
 
   const newOptions: PrevisOptions = {
     ...options.values,
+    testCommand: options.testCommand,
     env,
     addHook,
     exit,

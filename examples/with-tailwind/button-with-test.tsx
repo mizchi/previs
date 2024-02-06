@@ -9,3 +9,12 @@ export default function Button() {
     </button>
   );
 }
+
+if (import.meta.vitest) {
+  const { test, expect } = import.meta.vitest;
+  const { renderToString } = await import("react-dom/server");
+  test("should render", () => {
+    const result = renderToString(<Button />);
+    expect(result).toContain("button");
+  });
+}

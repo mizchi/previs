@@ -95,7 +95,8 @@ Please write a new code for ${filename}!`,
     retryWith(opts: {
       code: string,
       request: string,
-      failReason: string,
+      failedReason: string,
+      testCommand: string[],
       test?: string,
       lastPrompt?: string,
       imageUrl?: string,
@@ -104,7 +105,8 @@ Please write a new code for ${filename}!`,
         opts.code,
         opts.request,
         opts.test,
-        opts.failReason,
+        opts.testCommand,
+        opts.failedReason,
         opts.lastPrompt
       );
       return [{
@@ -147,6 +149,7 @@ function buildRetryRequest(
   code: string,
   request: string,
   test: string | undefined,
+  testCommand: string[],
   failReason: string,
   oldPrompt?: string
 ) {
@@ -164,6 +167,8 @@ ${oldPrompt ? `## Old prompt\n\n${oldPrompt}` : ''}
 ${request}
 
 ## Failed Reason
+
+test command: ${testCommand.join(" ")}
 
 ${failReason}
 

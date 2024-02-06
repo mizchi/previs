@@ -1,6 +1,6 @@
 # previs
 
-Interactive AI markupper for programmers.
+Interactive AI markupper for frontend developpers.
 
 ![previs example](ss.png)
 
@@ -18,14 +18,28 @@ Optional dependencies
 
 ## How to use
 
-Setup vite project and run `previs fix ...`
+At first, check with `previs doctor`.
 
 ```bash
 $ export PREVIS_OPENAI_API_KEY=...
-$ previs fix button.tsx
+$ previs doctor
+✅ git
+✅ code
+✅ imgcat
+✅ bat
+✅ PREVIS_OPENAI_API_KEY is set
+✅ vite: ./vite.config.mts
+✅ package.json: ./package.json
+✅ tsconfig.json: ./tsconfig.json
+✅ compilerOptions.jsx: react-jsx
+Library: react
+Base: ./
+```
 
+```bash
+$ previs button.tsx
 # with stylesheet (for tailwind and others)
-$ previs fix button.tsx --style style.css
+$ previs button.tsx --style style.css
 ```
 
 ### Preview Convensions
@@ -33,7 +47,7 @@ $ previs fix button.tsx --style style.css
 Put single file for preview in vite project.
 
 - exported `__PREVIEW__`
-- exported `deafult`
+- exported `default`
 
 Example.
 
@@ -56,12 +70,11 @@ export const __PREVIEW__ = () => {
 }
 ```
 
-Run `previs` with screenshot.
+### Run with test
 
 ```bash
-$ previs ss button.tsx
-[previs] start http://localhost:3434/
-<image output>
+# run after -- command before code accept and retry.
+$ previs button.tsx -- pnpm vitest --run
 ```
 
 ## TODO
@@ -71,7 +84,7 @@ $ previs ss button.tsx
   - [x] previs ss (screenshot)
   - [x] previs create
   - [x] previs fix
-  - [ ] previs doctor
+  - [x] previs doctor
 - Integration
   - [x] react
   - [ ] svelte
@@ -87,19 +100,15 @@ $ previs ss button.tsx
   - [ ] file named component detection
 - [x] load tailwind config
 - [x] format
+- [ ] previs.config.json
 - [x] width/height on preview
 - [x] show diff
-- [ ] refactor cli
-- [ ] cleanup pre/post
-- [ ] tmp file fix
-- [ ] tailwind cdn option
 - [ ] single binary
 - [ ] Fix retry
 - [ ] Web UI
-- [ ] Vitest
+- [ ] test checker
 - [ ] --import option
 - [ ] VRT
-- [ ] Change 
 
 ## LICENSE
 

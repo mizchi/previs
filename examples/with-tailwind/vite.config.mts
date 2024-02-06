@@ -1,7 +1,11 @@
-import { defineConfig } from 'npm:vite@5.0.11';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
   define: {
     "import.meta.main": JSON.stringify(false),
+  },
+  // @ts-ignore vitest
+  test: {
+    includeSource: ['**/*.{ts,tsx}'],
   }
 });
