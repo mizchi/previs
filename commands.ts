@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { startBuilder } from "./builder/mod.ts";
 import { join, $ } from "./deps.ts";
-import { getFixedComponent, getNewComponent, getNewFunction, getRetriedComponent, getRetriedFunction } from "./fixer/mod.ts";
+import { getFixedComponent, getFixedFunction, getNewComponent, getNewFunction } from "./fixer/mod.ts";
 import { PrevisOptions } from "./options.ts";
 import { startBrowser } from "./screenshot/mod.ts";
 import { analyzeEnv, detectLibraryFromTargetPath, getTempFilepath, pxToNumber } from "./utils.ts";
@@ -81,45 +81,26 @@ export async function fix(options: PrevisOptions, target: string) {
   while (true) {
     let newCode: string;
     if (uiMode) {
-      newCode = failedReason
-        ? await getRetriedComponent({
-          code,
-          vision,
-          library,
-          tailwind,
-          request: request!,
-          failedReason,
-          model: options.model,
-          testCommand: options.testCommand!,
-          debug: options.debug,
-          getImage: (() => runner!.getImage()),
-        })
-        : await getFixedComponent({
-          code,
-          vision,
-          library,
-          tailwind,
-          request: request!,
-          model: options.model,
-          debug: options.debug,
-          getImage: () => runner!.getImage(),
-        });
+      newCode = await getFixedComponent({
+        code,
+        vision,
+        library,
+        tailwind,
+        request: request!,
+        model: options.model,
+        debug: options.debug,
+        failedReason,
+        getImage: () => runner!.getImage(),
+      });
     } else {
-      newCode = failedReason
-        ? await getRetriedFunction({
-          code,
-          model: options.model,
-          testCommand: options.testCommand!,
-          request: request!,
-          debug: !!options.debug,
-          failedReason,
-        })
-        : await getNewFunction({
-          target,
-          model: options.model,
-          request: request!,
-          debug: !!options.debug,
-        });
+      newCode = await getFixedFunction({
+        code,
+        target,
+        model: options.model,
+        request: request!,
+        debug: !!options.debug,
+        failedReason,
+      });
     }
     if (options.testCommand) {
       const [cmd, ...args] = options.testCommand;
@@ -209,7 +190,7 @@ export async function generate(options: PrevisOptions, target: string) {
     });
 
     await Deno.writeTextFile(tempTarget, newCode);
-    if (!options.noDiff) {
+    if (!options.noPrint) {
       await printCode(tempTarget);
     }
     await runner.screenshot();
@@ -235,7 +216,7 @@ export async function generate(options: PrevisOptions, target: string) {
       debug: !!options.debug,
     });
     await Deno.writeTextFile(tempTarget, newCode);
-    if (!options.noDiff) {
+    if (!options.noPrint) {
       await printCode(tempTarget);
     }
     const accepted = options.yes ?? await options.getConfirm("Accept?");
@@ -300,7 +281,7 @@ async function runScreenshotBrowser(options: PrevisOptions, target: string) {
     screenshot: async () => {
       await builder.ensureBuild();
       await browser.screenshot(screenshotUrl);
-      if (!options.noDiff) {
+      if (!options.noPrint) {
         await $`git --no-pager diff --no-index --color=always ${target} ${tempTarget}`.noThrow();
       }
     }
