@@ -4,7 +4,7 @@ import { join, $ } from "./deps.ts";
 import { getFixedComponent, getNewComponent, getNewFunction, getRetriedComponent, getRetriedFunction } from "./fixer/mod.ts";
 import { PrevisOptions } from "./options.ts";
 import { startBrowser } from "./screenshot/mod.ts";
-import { analyzeEnv, getTempFilepath, pxToNumber } from "./utils.ts";
+import { analyzeEnv, detectLibraryFromTargetPath, getTempFilepath, pxToNumber } from "./utils.ts";
 
 const defaultPort = "3434";
 
@@ -33,10 +33,16 @@ export async function screenshot(options: PrevisOptions, target: string) {
 
 export async function fix(options: PrevisOptions, target: string) {
   const uiMode = !target.endsWith(".ts");
-
   const vision = !!options.vision && uiMode;
   const tempTarget = getTempFilepath(target);
+  const tailwind = options.env.useTailwind;
+  const library = await detectLibraryFromTargetPath(target) ?? options.env.libraryMode;
   const auto = options.auto;
+
+  console.log("[previs:detect]", {
+    tailwind,
+    library,
+  });
 
   if (auto && !options.testCommand) {
     throw new Error("testCommand is required for auto mode");
@@ -62,7 +68,7 @@ export async function fix(options: PrevisOptions, target: string) {
     }
   }
 
-  let request = options.request ?? auto ? "Pass tests" : await options.getInput("How to fix?");
+  let request = options.request ?? auto ? "Pass tests" : await options.getInput("Request>");
   if (!request) {
     await runner?.end();
     await Deno.remove(tempTarget);
@@ -79,8 +85,11 @@ export async function fix(options: PrevisOptions, target: string) {
         ? await getRetriedComponent({
           code,
           vision,
+          library,
+          tailwind,
           request: request!,
           failedReason,
+          model: options.model,
           testCommand: options.testCommand!,
           debug: options.debug,
           getImage: (() => runner!.getImage()),
@@ -88,7 +97,10 @@ export async function fix(options: PrevisOptions, target: string) {
         : await getFixedComponent({
           code,
           vision,
+          library,
+          tailwind,
           request: request!,
+          model: options.model,
           debug: options.debug,
           getImage: () => runner!.getImage(),
         });
@@ -96,6 +108,7 @@ export async function fix(options: PrevisOptions, target: string) {
       newCode = failedReason
         ? await getRetriedFunction({
           code,
+          model: options.model,
           testCommand: options.testCommand!,
           request: request!,
           debug: !!options.debug,
@@ -103,6 +116,7 @@ export async function fix(options: PrevisOptions, target: string) {
         })
         : await getNewFunction({
           target,
+          model: options.model,
           request: request!,
           debug: !!options.debug,
         });
@@ -173,7 +187,13 @@ export async function generate(options: PrevisOptions, target: string) {
     await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
     const runner = await runScreenshotBrowser(options, target);
     const vision = !!options.vision;
-    const printRaw = !!options.printRaw;
+    const tailwind = options.env.useTailwind;
+    const library = await detectLibraryFromTargetPath(target) ?? options.env.libraryMode;
+
+    console.log("[previs:detect]", {
+      tailwind,
+      library,
+    });
 
     const tempTarget = getTempFilepath(target);
     await runner.screenshot();
@@ -183,7 +203,10 @@ export async function generate(options: PrevisOptions, target: string) {
     const newCode = await getNewComponent({
       target,
       request,
-      printRaw,
+      tailwind,
+      library: library,
+      debug: options.debug,
+      model: options.model,
       vision,
     });
     await runner.screenshot();
@@ -205,6 +228,7 @@ export async function generate(options: PrevisOptions, target: string) {
     const request = options.request ?? await options.getInput("What is this file?");
     if (!request) return;
     const newCode = await getNewFunction({
+      model: options.model,
       target,
       request,
       debug: !!options.debug,
@@ -222,10 +246,7 @@ export async function generate(options: PrevisOptions, target: string) {
 
 export async function serve(options: PrevisOptions, target: string) {
   const builder = await runBuildServer(options, target);
-  Deno.addSignalListener("SIGINT", () => {
-    builder.end();
-    Deno.exit(0);
-  });
+  options.addHook(() => builder.end());
 }
 
 async function runBuildServer(options: PrevisOptions, target: string) {

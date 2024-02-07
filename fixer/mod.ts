@@ -1,5 +1,5 @@
 import { ChatMessage } from './types.ts';
-import { requestNewCode, selectModel } from "./request.ts";
+import { requestCode } from "./request.ts";
 import { buildMarkupper } from "./markupper.ts";
 import { buildCoder } from "./coder.ts";
 
@@ -7,10 +7,16 @@ export async function getFixedComponent(options: {
   code: string;
   request: string;
   vision: boolean;
+  model?: string;
   getImage: () => Promise<string>;
   debug?: boolean;
+  tailwind: boolean;
+  library: string;
 }): Promise<string> {
-  const markupper = buildMarkupper();
+  const markupper = buildMarkupper({
+    tailwind: options.tailwind,
+    library: options.library
+  });
   const test = undefined;
   const b64image = options.vision ? await options.getImage() : undefined;
   const messages = markupper.fix({
@@ -22,11 +28,11 @@ export async function getFixedComponent(options: {
       ? b64image
       : undefined,
   });
-  return await requestNewCode({
-    model: selectModel({ vision: options.vision }),
-    vision: options.vision,
+  return await requestCode({
+    model: options.model,
     debug: options.debug,
     messages: messages as ChatMessage[],
+    expectedSize: Array.from(options.code).length
   });
 }
 
@@ -37,12 +43,19 @@ export async function getRetriedComponent(options: {
   request: string;
   vision: boolean;
   getImage: () => Promise<string>;
+  tailwind: boolean;
+  library: string;
   debug?: boolean;
+  model?: string;
 }): Promise<string> {
-  const markupper = buildMarkupper();
+  const markupper = buildMarkupper({
+    tailwind: options.tailwind,
+    library: options.library
+  });
+
   const test = undefined;
   const b64image = options.vision ? await options.getImage() : undefined;
-  const messages = markupper.retryWith({
+  const messages = markupper.fixWithTest({
     code: options.code,
     test: test,
     request: options.request,
@@ -52,30 +65,36 @@ export async function getRetriedComponent(options: {
       ? b64image
       : undefined,
   });
-  return await requestNewCode({
-    model: selectModel({ vision: options.vision }),
-    vision: options.vision,
+  return await requestCode({
+    model: options.model,
     debug: options.debug,
     messages: messages as ChatMessage[],
+    expectedSize: Array.from(options.code).length
   });
 }
 
 export async function getNewComponent(options: {
   target: string;
   request: string;
-  printRaw: boolean;
   vision: boolean;
+  tailwind: boolean;
+  library: string;
+  debug?: boolean;
+  model?: string;
 }): Promise<string> {
-  const markupper = buildMarkupper();
+  const markupper = buildMarkupper({
+    tailwind: options.tailwind,
+    library: options.library
+  });
+
   const messages = markupper.generate({
     filename: options.target,
     request: options.request,
   });
-  const model = selectModel({ vision: options.vision });
-  const newCode = await requestNewCode({
-    model,
+  const newCode = await requestCode({
+    model: options.model,
     vision: options.vision,
-    printRaw: options.printRaw,
+    debug: options.debug,
     messages: messages as ChatMessage[],
   });
   return newCode;
@@ -84,17 +103,18 @@ export async function getNewComponent(options: {
 export async function getNewFunction(options: {
   target: string;
   request: string;
-  debug: boolean;
+  debug?: boolean;
+  model?: string;
+  vision?: boolean;
 }): Promise<string> {
   const coder = buildCoder();
   const messages = coder.generate({
     filename: options.target,
     request: options.request,
   });
-  const model = selectModel({ vision: false });
-  const newCode = await requestNewCode({
-    model: model,
-    vision: false,
+  const newCode = await requestCode({
+    model: options.model,
+    vision: options.vision,
     debug: options.debug,
     messages: messages as ChatMessage[],
   });
@@ -107,6 +127,8 @@ export async function getRetriedFunction(options: {
   failedReason: string;
   request: string;
   debug?: boolean;
+  model?: string;
+  vision?: boolean;
 }): Promise<string> {
   const coder = buildCoder();
   const test = undefined;
@@ -117,11 +139,12 @@ export async function getRetriedFunction(options: {
     testCommand: options.testCommand,
     failedReason: options.failedReason,
   });
-  return await requestNewCode({
-    model: selectModel({ vision: false }),
-    vision: false,
+  return await requestCode({
+    model: options.model,
+    vision: options.vision,
     debug: options.debug,
     messages: messages as ChatMessage[],
+    expectedSize: Array.from(options.code).length
   });
 }
 
@@ -130,18 +153,19 @@ export async function getFixedFunction(options: {
   code: string;
   request: string;
   debug: boolean;
+  model?: string;
+  vision?: boolean;
 }): Promise<string> {
   const coder = buildCoder();
   const messages = coder.fix({
     code: options.code,
     request: options.request,
   });
-  const model = selectModel({ vision: false });
-  const newCode = await requestNewCode({
-    model: model,
-    vision: false,
+  return await requestCode({
+    model: options.model,
+    vision: options.vision,
     debug: options.debug,
     messages: messages as ChatMessage[],
+    expectedSize: Array.from(options.code).length
   });
-  return newCode;
 }

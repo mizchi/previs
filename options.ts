@@ -6,6 +6,10 @@ const argsOptions = {
     type: "boolean",
     short: "h",
   },
+  model: {
+    type: "string",
+    short: "m",
+  },
   vision: {
     type: "boolean",
   },

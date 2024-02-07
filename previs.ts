@@ -117,7 +117,7 @@ try {
   // post cleanup
   addHook(() => cleanTempFiles(Deno.cwd()));
 
-  const env = analyzeEnv(Deno.cwd());
+  const env = await analyzeEnv(Deno.cwd());
   const first = options.positionals[0];
 
   const newOptions: PrevisOptions = {

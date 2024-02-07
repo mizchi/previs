@@ -1,6 +1,6 @@
 # previs
 
-Interactive AI markupper for frontend developpers.
+Interactive AI markup for frontend developpers.
 
 ![previs example](ss.png)
 
@@ -21,7 +21,14 @@ Optional dependencies
 At first, check with `previs doctor`.
 
 ```bash
+# Set PREVIS_OPENAI_API_KEY in your env
 $ export PREVIS_OPENAI_API_KEY=...
+
+# Create vite project
+$ npm create vite@latest
+# I recommend react-ts template
+
+# cd <project>
 $ previs doctor
 ✅ git
 ✅ code
@@ -38,22 +45,22 @@ Base: ./
 
 ```bash
 # Fix
-$ previs button.tsx
+$ previs src/button.tsx
 
 # Fix with import (for tailwind and others)
-$ previs button.tsx --import style.css
+$ previs src/button.tsx --import style.css
 
 # Fix with image upload (CAUTION: many token used)
-$ previs button.tsx --vision
+$ previs src/button.tsx --vision
 
 # Preview with size
-$ previs button.tsx -w 400px
+$ previs src/button.tsx -w 400px
 
 # Generate new file
 $ previs newfile.tsx
 ```
 
-### Preview Convensions
+### Previs Preview Convension
 
 Put single file for preview in vite project.
 
@@ -107,11 +114,10 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
   - [x] previs
   - [x] previs gen
   - [x] previs fix
-  - [ ] previs fix --auto
+  - [x] previs fix --auto
   - [x] previs doctor
   - [x] previs ss
   - [x] previs test
-  - [ ] previs gen-test
   - [ ] previs init
 - Integration
   - [x] react
@@ -128,6 +134,7 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
   - [ ] panda-css
 - [x] load tailwind config
 - [x] format
+- [ ] Zero config tailwind
 - [ ] Load `previs.config.json`
 - [ ] Load specified vite.config by options
 - [x] width/height

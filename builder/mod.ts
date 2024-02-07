@@ -5,14 +5,13 @@ import { buildReactProjectFiles } from "./react.ts";
 const PREVIS_ROOT = ".previs";
 const TARGET_MARKER = "__TARGET__";
 
-const log = (...args: Array<unknown>) => console.log("[previs]", ...args);
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type BuilderOption = {
   cwd: string;
   target: string;
   port: number;
-  imports: string[]
+  imports: string[];
 };
 
 export async function startBuilder(options: BuilderOption) {
@@ -24,6 +23,7 @@ export async function startBuilder(options: BuilderOption) {
   const server = await createServer({
     root: settings.virtualRoot,
     base: options.cwd,
+    logLevel: "silent",
     configFile: settings.preExists ? settings.configPath : undefined,
     clearScreen: false,
     server: { port: options.port },
@@ -31,7 +31,7 @@ export async function startBuilder(options: BuilderOption) {
     cacheDir: join(settings.virtualRoot, ".vite")
   });
   server.listen();
-  log(`start http://localhost:${options.port}/`);
+  console.log(`[previs:server] http://localhost:${options.port}/`);
   return {
     async ensureBuild() {
       // health check
@@ -103,34 +103,6 @@ async function findProjectSettings(cwd: string): Promise<ViteSettings> {
     virtualRoot: previewDir
   };
 }
-
-// const VITE_CONFIG_EXTENTIONS = [
-//   '.ts',
-//   '.js',
-//   '.mjs',
-//   '.mts',
-// ];
-// export async function findViteProjectDirectory(cwd: string): Promise<ViteSettings | undefined> {
-//   let currentDir = cwd;
-//   while (currentDir !== "/") {
-//     for (const ext of VITE_CONFIG_EXTENTIONS) {
-//       const configPath = join(currentDir, `vite.config${ext}`);
-//       if (await exists(configPath)) {
-//         return {
-//           preExists: true,
-//           dir: currentDir,
-//           configPath,
-//         }
-//       }
-//     }
-//     const parentDir = dirname(currentDir);
-//     if (parentDir === currentDir) {
-//       break;
-//     }
-//     currentDir = parentDir;
-//   }
-//   return undefined;
-// }
 
 export async function initializeProject(
   {

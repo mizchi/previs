@@ -1,14 +1,18 @@
 import { ChatContent, ChatMessage } from './types.ts';
 
-const INTRO = 'You are CSS specialist. You write typescript-jsx(tsx) code.';
+const SHARED_INTRO = 'You are CSS specialist. You write typescript-jsx(tsx) code.';
 
-const MARKUP_RULES = `## Rules
+const RULES = [
+  'You should pass the test code given by the user',
+  'No comments or explanations other than the code you are outputting are required. Instead, please leave a comment in the code whenever possible to indicate what the intent of the code was output.',
+  'Please describe any changes you have made in the comments so that the intent is easy to read',
+  'Write your comments in the same language as the instructions given',
+  'Do not omit the existing code in output. Your generated code will be used as a part of the user\'s code directly.'
+];
 
-- You should pass the test code given by the user
-- No comments or explanations other than the code you are outputting are required. Instead, please leave a comment in the code whenever possible to indicate what the intent of the code was output.
-- Please describe any changes you have made in the comments so that the intent is easy to read
-- Write your comments in the same language as the instructions given
-- Do not omit the existing code in output. Your generated code will be used as a part of the user's code directly.`;
+const EXPORTED_PREVIEW_RULE = 'Exported \`__PREVIEW__\` is previewable component for check without props. If the component has a prop, you should use the prop in __PREVIEW__.'
+const USING_TAILWIND_RULE = 'You can use tailwindcss classes in your code';
+const DO_NOT_USE_TAILWIND_RULE = 'You should not use tailwindcss classes in your code';
 
 const OUTPUT_EXAMPLE = `## Output Example
 
@@ -23,55 +27,32 @@ export function __PREVIEW__() {
 \`\`\`
 `;
 
-const MARKUP_FIX_PROMPT = `${INTRO}
-Please fix code with request.
+type MarkupperOptions = {
+  tailwind: boolean,
+  library: string // 'react' | 'vue' | 'svelte',
+}
 
-${MARKUP_RULES}
+const GENERATE_INTO = (library: string) => `Please generate a new component of ${library} by user request.`;
+const FIX_INTRO = 'Please fix code for user request.';
+
+function buildSystemPrompt(intro: string, options: MarkupperOptions) {
+  const rules = [...RULES, EXPORTED_PREVIEW_RULE];
+  if (options.tailwind) {
+    rules.push(USING_TAILWIND_RULE);
+  }
+  return `${SHARED_INTRO}
+${intro}
+
+## Rules
+
+${rules.map(s => `- ${s}`).join('\n')}
 
 ${OUTPUT_EXAMPLE}
 `;
+}
 
-const MARKUP_SYSTEM_NEW_PROMPT = `${INTRO}
-Please generate a new component of React by user request.
-
-${MARKUP_RULES}
-- Exported \`__PREVIEW__\` is previewable component for check without props. If the component has a prop, you should use the prop in __PREVIEW__.
-
-${OUTPUT_EXAMPLE}
-`;
-
-
-export function buildMarkupper() {
-  // let history: ChatMessage[] = [];
+export function buildMarkupper(options: MarkupperOptions) {
   return {
-    reset() {
-      // history = [];
-    },
-    generate(opts: {
-      filename: string,
-      request: string,
-    }): ChatMessage[] {
-      // WIP
-      const { filename, request } = opts;
-      return [
-        {
-          role: 'system',
-          content: MARKUP_SYSTEM_NEW_PROMPT,
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: "text",
-              text: `## Request
-
-${request}
-
-Please write a new code for ${filename}!`,
-            }
-          ]
-        }]
-    },
     fix(opts: {
       code: string,
       test?: string,
@@ -84,7 +65,7 @@ Please write a new code for ${filename}!`,
       return [
         {
           role: 'system',
-          content: MARKUP_FIX_PROMPT,
+          content: buildSystemPrompt(FIX_INTRO, options),
         },
         {
           role: 'user',
@@ -92,7 +73,7 @@ Please write a new code for ${filename}!`,
         },
       ]
     },
-    retryWith(opts: {
+    fixWithTest(opts: {
       code: string,
       request: string,
       failedReason: string,
@@ -111,14 +92,39 @@ Please write a new code for ${filename}!`,
       );
       return [{
         role: 'system',
-        content: MARKUP_FIX_PROMPT,
+        content: buildSystemPrompt(FIX_INTRO, options),
       },
       {
         role: 'user',
         content: opts.imageUrl ? withImage(retryContent, opts.imageUrl) : retryContent,
       }]
       // return messages;
-    }
+    },
+    generate(opts: {
+      filename: string,
+      request: string,
+    }): ChatMessage[] {
+      // WIP
+      const { filename, request } = opts;
+      return [
+        {
+          role: 'system',
+          content: buildSystemPrompt(GENERATE_INTO(options.library), options),
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: "text",
+              text: `## Request
+
+${request}
+
+Please write a new code for ${filename}!`,
+            }
+          ]
+        }]
+    },
   }
 }
 

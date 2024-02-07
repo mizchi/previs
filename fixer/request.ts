@@ -1,76 +1,48 @@
-import { readFile } from 'node:fs/promises';
-import { OpenAI, prettier, Spinner } from "../deps.ts";
+import { prettier, Spinner } from "../deps.ts";
 import { ChatMessage } from "./types.ts";
+import { streamOpenAI } from "./openai_helper.ts";
 
-type RequestOptions = {
-  vision?: boolean,
-  model?: string,
+// pure fetch impl of requestToOpenAI
+type RequestCodeOptions = {
   messages: ChatMessage[],
-  type?: string,
-  key?: string,
-  printRaw?: boolean,
-  history?: boolean,
-  onProgress?: (state: string) => void,
+  // optional
+  model?: string,
+  vision?: boolean,
+  apiKey?: string,
   debug?: boolean,
+  expectedSize?: number,
 }
 
-const defaultModel = "gpt-4-1106-preview";
+const GPT_4_VISION_MODEL = 'gpt-4-vision-preview';
+const GPT_4_PREVIEW_MODEL = 'gpt-4-1106-preview';
 
-export function selectModel(opts: { vision?: boolean }) {
-  return opts.vision ? 'gpt-4-vision-preview' : "gpt-4-1106-preview";
+export function inferModel(options: {
+  messages: ChatMessage[],
+  vision?: boolean,
+}) {
+  if (options.vision) return GPT_4_VISION_MODEL;
+  const hasImage = options.messages.some(m => Array.isArray(m.content));
+  if (hasImage) return GPT_4_VISION_MODEL;
+  return GPT_4_PREVIEW_MODEL;
 }
 
-export async function requestNewCode(options: RequestOptions) {
-  const apiKey = getApiKey();
-  const client = new OpenAI({ apiKey });
-  const encoder = new TextEncoder();
-
-  const stream = await client.chat.completions.create({
-    model: options.model ?? defaultModel,
-    // @ts-ignore - `messages` is not in the type definition
-    messages: options.messages,
-    max_tokens: options.model === 'gpt-4-vision-preview' ? 4096 : null,
-    stream: true,
-  });
-
-
-  // TODO: Refactor to other file
+export async function requestCode(options: RequestCodeOptions) {
+  const apiKey = options.apiKey ?? getApiKey();
+  const model = options.model ?? inferModel({ messages: options.messages, vision: options.vision });
   let spinner: ReturnType<typeof Spinner.getInstance> | null = null;
-  if (!options.printRaw) {
+  if (!options.debug) {
     spinner = Spinner.getInstance();
     spinner.start('generating...');
     spinner.setSpinnerType('dots8');
   }
-  let result = '';
-  for await (const chunk of stream) {
-    for (const choice of chunk.choices ?? []) {
-      const out = choice.delta?.content ?? '';
-      if (!out) continue;
-      result += out;
-      write(out);
-      spinner?.setText(`generating... ${result.length}`);
-      options.onProgress?.(out);
-    }
+  let raw = '';
+  for await (const input of streamOpenAI({ ...options, model, apiKey })) {
+    raw += input;
+    spinner?.setText(`generating... ${raw.length} ${options.expectedSize ? `| ${options.expectedSize} (expected)` : ''}`);
   }
-  write('\n');
-  if (!options.printRaw && spinner) {
-    spinner.stop();
-  }
-
-  // console.log('result', JSON.stringify(xs, null, 2));
-  const code = extractCodeBlock(result);
-  if (!code) {
-    throw new Error("Failed to generate code");
-  }
-  return code;
-
-  function write(str: string) {
-    if (options.printRaw) Deno.stdout.writeSync(encoder.encode(str));
-  }
-  function extractCodeBlock(str: string): string {
-    const result = str.match(/```tsx\n([\s\S]+?)\n```/)?.[1] ?? '';
-    return prettier.format(result, { parser: "typescript" });
-  }
+  spinner?.stop();
+  // TODO: validate
+  return extractCodeBlock(raw);
 }
 
 function getApiKey() {
@@ -79,49 +51,8 @@ function getApiKey() {
   return apiKey;
 }
 
-Deno.test("with image", async () => {
-  const apiKey = getApiKey();
-  if (!apiKey) return;
-  const b64image = await readFile(new URL("../ss.png", import.meta.url)).then((buf) => buf.toString("base64"));
-  const result = await requestNewCode({
-    vision: true,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            image_url: {
-              url: `data:image/png;base64,${b64image}`
-            }
-          },
-          {
-            type: "text",
-            text: `describe the image above.
-            Return the description of the image in a json format: { "description": string}
-            `,
-          }
-        ],
-      },
-    ],
-    printRaw: true,
-  });
-  console.log(result);
-  // assertEquals(result, "const a = 1;\n");
-});
+function extractCodeBlock(str: string): string {
+  const result = str.match(/```tsx\n([\s\S]+?)\n```/)?.[1] ?? '';
+  return prettier.format(result, { parser: "typescript" });
+}
 
-// Deno.test("with image", async () => {
-//   const apiKey = getApiKey();
-//   if (!apiKey) return;
-
-//   const model = selectModel({ vision: true });
-//   const messages = JSON.parse(await readFile(new URL("__fixtures__/out.json", import.meta.url)).then((buf) => buf.toString()));
-//   const result = await requestNewCode({
-//     printRaw: true,
-//     model,
-//     vision: true,
-//     messages: messages
-//   });
-//   console.log(result);
-//   // assertEquals(result, "const a = 1;\n");
-// });

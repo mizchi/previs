@@ -112,29 +112,25 @@ export async function findGitignore(cwd: string) {
   return await findClosest(cwd, packageJsonChecker);
 }
 
-
-export async function analyzeTarget(filepath: string) {
+export async function detectLibraryFromTargetPath(filepath: string): Promise<LibraryMode | undefined> {
   // TODO: Solid
   // TODO: htmx
-  let library: LibraryMode = 'vanilla';
+  // TODO: html
   if (filepath.endsWith('.svelte')) {
-    library = 'svelte';
+    return 'svelte';
   } else if (filepath.endsWith('.vue')) {
-    library = 'vue';
-  } else {
+    return 'vue';
+  } else if (filepath.endsWith('.tsx') || filepath.endsWith('.jsx')) {
     const content = await Deno.readTextFile(filepath);
     const jsxPragma = findJsxPragma(content);
     if (jsxPragma === 'preact') {
-      library = 'preact';
+      return 'preact';
     }
     if (jsxPragma === '@builder.io/qwik') {
-      library = 'qwik';
+      return 'qwik';
     }
-    library = 'react';
   }
-  return {
-    library,
-  }
+  return undefined;
 
   function findJsxPragma(content: string) {
     const jsxPragma = JSX_PRAGMA_REGEX.exec(content);
@@ -146,7 +142,7 @@ export async function analyzeTarget(filepath: string) {
   }
 }
 
-export type AnalyzedEnv = ReturnType<typeof analyzeEnv>;
+export type AnalyzedEnv = Awaited<ReturnType<typeof analyzeEnv>>;
 export async function analyzeEnv(cwd: string) {
   const viteDir = await findViteProjectDirectory(cwd);
   const gitignore = await findGitignore(cwd);
