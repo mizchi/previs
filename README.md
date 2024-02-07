@@ -9,7 +9,7 @@ Interactive AI markup for frontend developpers.
 Install deno https://docs.deno.com/runtime/manual/getting_started/installation
 
 ```bash
-$ deno install -Af https://deno.land/x/previs@0.1.1/previs.ts
+$ deno install -Af https://deno.land/x/previs@0.1.2/previs.ts
 ```
 
 ## Requirements
