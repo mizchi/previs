@@ -1,14 +1,20 @@
-zenn に投稿する記事の下書き
-
+---
+title: "previs: 面倒なマークアップは AI にやらせる"
+emoji: "😸"
+type: "tech" # tech: 技術記事 / idea: アイデア
+topics: ["ai", "frontend", "deno"]
+published: true
 ---
 
-# previs: 面倒なマークアップは AI にやらせる
-
-自分はフロントエンドのロジックを考えるのは得意なんですが、スタイルシート書くのはあまり得意ではないです。
+自分はフロントエンドのロジックを考えるのは得意なんですが、CSS は苦手です。
 
 なので 自分は AI にコード変更を依頼して実行結果を目視でプレビューしつつ、その結果を受けいれるかどうかの判断だけすればよくね？と考えて、それを CLIとして実装してみました。
 
-![demo](https://cdn.deno.land/previs/versions/v0.1.1/raw/ss.png)
+ボタンの色を書き換えるという簡単な例ですが、こんな感じで動きます。
+
+![previs demo](https://i.gyazo.com/def3e55b6af3391df9901e3575aa6bcc.png)
+
+主に React Component の修正をターゲットにしていますが、class(Name) を書き換えることを優先するプロンプトを与えているので、ロジックを保ちつつ、見た目を綺麗にするためのツールになっています。
 
 ## 実装した背景
 
@@ -21,9 +27,11 @@ OpenAI API は`gpt-4-vision-preview` のモデルで画像をアップロード�
 
 https://zenn.dev/mizchi/scraps/50afabbf5e552e
 
+これらを使って、vscode terminal で実行することを前提に実装していいます。動作確認していませんが iterm2 でも動くはず。
+
 ## previs の紹介
 
-https://deno.land/x/previs@v0.1.1
+https://deno.land/x/previs@v0.1.3
 
 vite プロジェクト上で `$ previs <filename>` で任意の React Component を含むファイルを指定すると、そのコンポーネント単体で実行する vite で実行する静的サイトをビルドします。
 
@@ -258,14 +266,16 @@ In-Source Testing を使っている意図としては、同じファイルに�
 
 今認識してる問題と機能追加
 
-- `.previs*` や `*.__previs__.tsx` みたいなファイルが実行後のゴミとして残ることがある
-- OpenAI API の出力をパースする処理が失敗することがある
-- `-W`, `-H` でプレビューするサイズの計算がおかしい
-- WebUI 版
-- 外部ライブラリを利用したり、別コンポーネントの参照を許可するパターン
+- `.previs*` や `*.__previs__.tsx` が実行後のゴミとして残ることがある
+- 稀に OpenAI API の出力をパースする処理が失敗することがある
+- `-W`, `-H` でプレビューするサイズの計算がおかしいのを修正
+- Web UI
+- 外部ライブラリを利用したり、別コンポーネントの参照を許可するプロンプトパターンを用意
 - preact
 - svelte
 - vue
+- html
+- astro
 
 ## 内部実装の話
 
