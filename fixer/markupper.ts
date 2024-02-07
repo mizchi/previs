@@ -1,3 +1,4 @@
+import I from "https://esm.sh/v135/immediate@3.0.6/denonext/immediate.mjs";
 import { ChatContent, ChatMessage } from './types.ts';
 
 const SHARED_INTRO = 'You are CSS specialist. You write typescript-jsx(tsx) code.';
@@ -55,13 +56,13 @@ export function buildMarkupper(options: MarkupperOptions) {
   return {
     fix(opts: {
       code: string,
-      test?: string,
       request: string,
-      oldPrompt?: string,
+      test?: string,
+      failedReason?: string,
       imageUrl?: string,
     }): ChatMessage[] {
-      const { code, test, request, oldPrompt, imageUrl } = opts;
-      const fixingContent = buildFixRequest(code, request, test, oldPrompt);
+      const { code, test, request, imageUrl } = opts;
+      const fixingContent = buildFixRequest(code, request, test, opts.failedReason);
       return [
         {
           role: 'system',
@@ -132,23 +133,32 @@ function buildFixRequest(
   code: string,
   request: string,
   test?: string,
-  oldPrompt?: string
+  failedReason?: string
 ) {
-  return `## Code
+  let result = `## Code
 
 \`\`\`tsx
 ${code}
 \`\`\`
 
 ${test ? `## Test\n\n${test}\n` : ''}
-${oldPrompt ? `## Old prompt\n${oldPrompt}` : ''}
 
 ## Request
 
 ${request}
-
-Let's fix the code!
 `;
+  if (failedReason) {
+    result += `## Failed Reason
+
+${failedReason}
+
+You should modify the code to pass the test.
+`;
+  } else {
+    result += "Let's fix the code!"
+      ;
+  }
+  return result;
 }
 
 function buildRetryRequest(

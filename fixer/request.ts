@@ -14,7 +14,8 @@ type RequestCodeOptions = {
 }
 
 const GPT_4_VISION_MODEL = 'gpt-4-vision-preview';
-const GPT_4_PREVIEW_MODEL = 'gpt-4-1106-preview';
+const GPT_4_TURBO_PREVIEW_MODEL = 'gpt-4-turbo-preview';
+// const GPT_4_PREVIEW_MODEL = 'gpt-4-1106-preview';
 
 export function inferModel(options: {
   messages: ChatMessage[],
@@ -23,7 +24,7 @@ export function inferModel(options: {
   if (options.vision) return GPT_4_VISION_MODEL;
   const hasImage = options.messages.some(m => Array.isArray(m.content));
   if (hasImage) return GPT_4_VISION_MODEL;
-  return GPT_4_PREVIEW_MODEL;
+  return GPT_4_TURBO_PREVIEW_MODEL;
 }
 
 export async function requestCode(options: RequestCodeOptions) {
