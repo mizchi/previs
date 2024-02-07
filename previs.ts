@@ -40,12 +40,14 @@ async function exit(status: number) {
 const __queue = options.values.queue ? options.values.queue.split(",").map(s => s.trim()) : undefined;
 async function getInput(message: string): Promise<string | undefined> {
   if (Array.isArray(__queue)) return __queue.shift();
-  return await $.prompt(message);
+  const result = await $.prompt(message);
+  console.log(`${message}: ${result}`);
+  return result;
 }
 async function getConfirm(message: string): Promise<boolean> {
   if (Array.isArray(__queue)) {
     const next = __queue.shift();
-    return next === "y";
+    return next === "y" || next === "Y";
   }
   return await $.confirm(message);
 }

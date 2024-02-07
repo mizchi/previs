@@ -147,7 +147,7 @@ export async function fix(options: PrevisOptions, target: string) {
       break;
     }
 
-    request = await options.getInput("Accept? [y/N/Prompt]");
+    request = await options.getInput("Accept? [y/N/<request>]");
     if (request === "y") {
       await Deno.rename(tempTarget, target);
       break;
@@ -297,7 +297,9 @@ async function runScreenshotBrowser(options: PrevisOptions, target: string) {
     screenshot: async () => {
       await builder.ensureBuild();
       await browser.screenshot(screenshotUrl);
-      await $`git --no-pager diff --no-index --color=always ${target} ${tempTarget}`.noThrow();
+      if (!options.noDiff) {
+        await $`git --no-pager diff --no-index --color=always ${target} ${tempTarget}`.noThrow();
+      }
     }
   }
 }

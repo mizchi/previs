@@ -53,6 +53,9 @@ const argsOptions = {
     type: 'boolean',
     short: 'r',
   },
+  noDiff: {
+    type: 'boolean',
+  },
   port: {
     type: "string",
     short: "p",

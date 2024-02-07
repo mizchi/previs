@@ -9,7 +9,7 @@ Interactive AI markup for frontend developpers.
 Install deno https://docs.deno.com/runtime/manual/getting_started/installation
 
 ```bash
-$ deno install -Af https://deno.land/x/previs@0.0.29/previs.ts
+$ deno install -Af https://deno.land/x/previs@0.0.28/previs.ts
 ```
 
 ## Requirements
@@ -100,7 +100,7 @@ $ previs src/button.tsx -- pnpm vitest --run __FILE__
 Put single file for preview in vite project.
 
 1. exported `__PREVIEW__`
-  - `export function __PREVIEW__(/* no props */) {}`
+  - `export function __PREVIEW__(/* shoud be non-props component */) {}`
 2. Same symbol of filename(caseless)
   - `Button.tsx` => `export function Button() {...}`
 3. exported `default`
@@ -117,7 +117,7 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
 
 ## How it works
 
-- Create temporal vite porject under `.previs-*`
+- Create temporal `vite` porject under `.previs-*`
 - Run `vite` server in deno
 - Run `puppeteer` and take screenshot
 - Print screenshot by imgcat and `vscode` terminal image integration
