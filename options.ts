@@ -76,8 +76,8 @@ export type PrevisOptions = ReturnType<typeof getParsedArgs>['values'] & {
   testCommand?: string[];
   addHook: (fn: () => void) => void;
   exit: (code: number) => void;
-  getInput: (message: string) => Promise<string | undefined>;
-  getConfirm: (message: string) => Promise<boolean>;
+  getInput: (message: string) => string | undefined;
+  getConfirm: (message: string) => boolean;
 };
 
 export function getParsedArgs(args: string[]) {

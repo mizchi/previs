@@ -1,5 +1,5 @@
 import { generate, fix, init, screenshot, serve, doctor, test } from "./commands.ts";
-import { join, $, exists } from "./deps.ts";
+import { join, exists } from "./deps.ts";
 import { help, getParsedArgs, PrevisOptions } from "./options.ts"
 import { analyzeEnv } from "./utils.ts";
 
@@ -37,19 +37,23 @@ async function exit(status: number) {
   Deno.exit(status);
 }
 
-const __queue = options.values.queue ? options.values.queue.split(",").map(s => s.trim()) : undefined;
-async function getInput(message: string): Promise<string | undefined> {
-  if (Array.isArray(__queue)) return __queue.shift();
-  const result = await $.prompt(message);
-  console.log(`${message} ${result}`);
-  return result;
+// const __queue = options.values.queue ? options.values.queue.split(",").map(s => s.trim()) : undefined;
+function getInput(message: string): string | undefined {
+  const handler = () => {
+  };
+  Deno.addSignalListener('SIGINT', handler);
+  const ret = prompt(message);
+  Deno.removeSignalListener('SIGINT', handler);
+  if (ret === null) return undefined;
+  return ret;
 }
-async function getConfirm(message: string): Promise<boolean> {
-  if (Array.isArray(__queue)) {
-    const next = __queue.shift();
-    return next === "y" || next === "Y";
+
+function getConfirm(message: string): boolean {
+  const out = prompt(`${message} [y/n]`);
+  if (out === null || out.toLowerCase() === 'n') {
+    return false;
   }
-  return await $.confirm(message);
+  return out.toLowerCase() === 'y';
 }
 
 async function cleanTempFiles(dir: string) {
@@ -58,22 +62,6 @@ async function cleanTempFiles(dir: string) {
     if (entry.isDirectory && entry.name !== ".previs" && entry.name.startsWith(".previs")) {
       console.log("[previs:clean]", entry.name + '/*');
       await Deno.remove(join(dir, entry.name), { recursive: true, });
-    }
-    // remove or rollback .bk files
-    if (entry.isFile && entry.name.endsWith(".bk")) {
-      const backupPath = join(dir, entry.name);
-      const originalPath = backupPath.replace(/\.bk$/, "");
-      const doRollback = await getConfirm(`[previs] Dirty file exists. Do you want to rollback ${originalPath}?`);
-      if (doRollback) {
-        const backupContent = await Deno.readTextFile(backupPath);
-        await Deno.writeTextFile(originalPath, backupContent);
-        await Deno.remove(backupPath);
-        console.log("[previs:rollback]", originalPath);
-        console.log("[previs:clean]", backupPath);
-      } else {
-        await Deno.remove(backupPath);
-        console.log("[previs:clean]", backupPath);
-      }
     }
     // remove or rollback .bk files
     if (entry.isFile && entry.name.includes(".__previs__.")) {
