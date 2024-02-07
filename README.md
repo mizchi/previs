@@ -2,7 +2,7 @@
 
 Interactive AI markup for frontend developpers.
 
-![demo](ss2.png)
+![demo](ss.png)
 
 ## Install
 
@@ -86,7 +86,7 @@ $ previs src/button.tsx --import style.css
 $ previs src/button.tsx --vision
 
 # Preview with size
-$ previs src/button.tsx -w 400px
+$ previs src/button.tsx -W 400px
 
 # Generate new file
 $ previs newfile.tsx

@@ -1,16 +1,16 @@
 export default function Button() {
-  // Changed button color to red (bg-red-500) and hover color to darker red (hover:bg-red-700)
+  // Changed the button text to "Click me"
   return (
     <button
       type="button"
-      className="bg-red-500 text-white font-semibold py-2 px-4 rounded shadow hover:bg-red-700 transition duration-300"
+      className="bg-blue-500 text-white font-semibold py-2 px-4 rounded shadow hover:bg-blue-700 transition duration-300 border border-white"
     >
-      button
+      &#x1F4C8; Click me {/* Updated text */}
     </button>
   );
 }
 
-// The __PREVIEW__ function remains the same; it showcases the Button component
+// The __PREVIEW__ function now showcases the Button component with the text "Click me"
 export function __PREVIEW__() {
   return <Button />;
 }

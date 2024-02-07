@@ -1,67 +1,47 @@
-import React from "react"; // Import has been changed to default import
+import React from "react";
 
-type LayoutProps = {
-  children: React.ReactNode; // ReactNode updated to React.ReactNode
-};
+interface LayoutProps {
+  header: React.ReactNode;
+  sidebar: React.ReactNode;
+  footer: React.ReactNode;
+  content: React.ReactNode;
+}
 
-type HeaderProps = {
-  // Props definition for Header if needed
-};
-
-type FooterProps = {
-  // Props definition for Footer if needed
-};
-
-// Header component definition
-// Header styling has been enhanced
-const Header: React.FC<HeaderProps> = () => {
+export default function Layout({
+  header,
+  sidebar,
+  footer,
+  content,
+}: LayoutProps) {
+  // Changed the div structure with the "flex" property and "flex-col" for vertical layout
   return (
-    <header className="bg-blue-600 text-white p-4 shadow-md">
-      <div className="container mx-auto">
-        {" "}
-        {/* Added container for alignment */}
-        <h1 className="text-xl font-bold">Header</h1>
-        <nav className="mt-2">
-          {/* Navigation added */}
-          <ul className="flex space-x-4">
-            {" "}
-            {/* Flex layout for navigation */}
-            <li className="hover:text-blue-300">Home</li>
-            <li className="hover:text-blue-300">About</li>
-            <li className="hover:text-blue-300">Contact</li>
-          </ul>
-        </nav>
+    <div className="flex flex-col h-screen">
+      <header className="bg-blue-500 text-white p-4">{header}</header>
+      <div className="flex-grow flex overflow-hidden">
+        <aside className="bg-gray-700 text-white w-64 p-4 overflow-y-auto">
+          {sidebar}
+        </aside>
+        <main className="flex-grow p-4 overflow-y-auto">{content}</main>
       </div>
-    </header>
-  );
-};
-
-// Footer component definition
-const Footer: React.FC<FooterProps> = () => {
-  return <footer className="bg-blue-500 text-white p-4">Footer</footer>;
-};
-
-const Layout: React.FC<LayoutProps> = ({ children }) => {
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Header /> {/* Using Header component */}
-      <main className="flex-1 p-4">{children}</main>
-      <Footer /> {/* Using Footer component */}
+      <footer className="bg-gray-800 text-white p-4">{footer}</footer>
     </div>
   );
-};
+}
 
-export default Layout;
-
+// Adjusted the __PREVIEW__ component to work correctly without props for preview purposes
 export function __PREVIEW__() {
+  // Applied placeholder content for the preview
+  const headerContent = <div>Header Placeholder</div>;
+  const sidebarContent = <div>Sidebar Placeholder</div>;
+  const footerContent = <div>Footer Placeholder</div>;
+  const mainContent = <div>Main Content Placeholder</div>;
+
   return (
-    <Layout>
-      <div className="text-center p-4">
-        <h2 className="font-bold text-lg mb-4">
-          Welcome to the Layout Preview
-        </h2>
-        <p>This is an example of content within the shared layout.</p>
-      </div>
-    </Layout>
+    <Layout
+      header={headerContent}
+      sidebar={sidebarContent}
+      footer={footerContent}
+      content={mainContent}
+    />
   );
 }

@@ -29,11 +29,11 @@ const argsOptions = {
   },
   width: {
     type: "string",
-    short: "w",
+    short: "W",
   },
   height: {
     type: "string",
-    short: "h",
+    short: "H",
   },
   queue: {
     type: "string",

@@ -196,8 +196,6 @@ export async function generate(options: PrevisOptions, target: string) {
     });
 
     const tempTarget = getTempFilepath(target);
-    await runner.screenshot();
-    // first time
     const request = options.request ?? await options.getInput("What is this file?");
     if (!request) return;
     const newCode = await getNewComponent({
@@ -209,9 +207,12 @@ export async function generate(options: PrevisOptions, target: string) {
       model: options.model,
       vision,
     });
-    await runner.screenshot();
+
     await Deno.writeTextFile(tempTarget, newCode);
-    await printCode(tempTarget);
+    if (!options.noDiff) {
+      await printCode(tempTarget);
+    }
+    await runner.screenshot();
     const accepted = options.yes ?? await options.getConfirm("Accept?");
     if (accepted) {
       await Deno.rename(tempTarget, target);
@@ -234,7 +235,9 @@ export async function generate(options: PrevisOptions, target: string) {
       debug: !!options.debug,
     });
     await Deno.writeTextFile(tempTarget, newCode);
-    await printCode(tempTarget);
+    if (!options.noDiff) {
+      await printCode(tempTarget);
+    }
     const accepted = options.yes ?? await options.getConfirm("Accept?");
     if (accepted) {
       await Deno.rename(tempTarget, target);

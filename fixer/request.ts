@@ -38,9 +38,15 @@ export async function requestCode(options: RequestCodeOptions) {
   let raw = '';
   for await (const input of streamOpenAI({ ...options, model, apiKey })) {
     raw += input;
+    if (options.debug) {
+      await Deno.stdout.write(new TextEncoder().encode(input));
+    }
     spinner?.setText(`generating... ${raw.length} ${options.expectedSize ? `| ${options.expectedSize} (expected)` : ''}`);
   }
-  spinner?.stop();
+  if (options.debug) {
+    await Deno.stdout.write(new TextEncoder().encode('\n'));
+  }
+  await spinner?.stop();
   // TODO: validate
   return extractCodeBlock(raw);
 }
