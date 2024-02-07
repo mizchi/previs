@@ -3,18 +3,26 @@ import { requestCode } from "./request.ts";
 import { buildMarkupper } from "./markupper.ts";
 import { buildCoder } from "./coder.ts";
 
-export async function getFixedComponent(options: {
-  code: string;
+export type NewOptions = {
+  target: string;
   request: string;
+  debug?: boolean;
+  model?: string;
+}
+
+export interface FixOptions extends NewOptions {
+  code: string;
+  failedReason?: string;
+}
+
+export type ViewContext = {
   vision: boolean;
-  getImage: () => Promise<string>;
   tailwind: boolean;
   library: string;
-  // optional
-  failedReason?: string;
-  model?: string;
-  debug?: boolean;
-}): Promise<string> {
+  getImage: () => Promise<string>;
+}
+
+export async function getFixedComponent(options: FixOptions & ViewContext): Promise<string> {
   const markupper = buildMarkupper({
     tailwind: options.tailwind,
     library: options.library
@@ -37,15 +45,7 @@ export async function getFixedComponent(options: {
   });
 }
 
-export async function getNewComponent(options: {
-  target: string;
-  request: string;
-  vision: boolean;
-  tailwind: boolean;
-  library: string;
-  debug?: boolean;
-  model?: string;
-}): Promise<string> {
+export async function getNewComponent(options: NewOptions & ViewContext): Promise<string> {
   const markupper = buildMarkupper({
     tailwind: options.tailwind,
     library: options.library
@@ -64,13 +64,8 @@ export async function getNewComponent(options: {
   return newCode;
 }
 
-export async function getNewFunction(options: {
-  target: string;
-  request: string;
-  debug?: boolean;
-  model?: string;
-  vision?: boolean;
-}): Promise<string> {
+
+export async function getNewCode(options: NewOptions): Promise<string> {
   const coder = buildCoder();
   const messages = coder.generate({
     filename: options.target,
@@ -78,22 +73,13 @@ export async function getNewFunction(options: {
   });
   const newCode = await requestCode({
     model: options.model,
-    vision: options.vision,
     debug: options.debug,
     messages: messages as ChatMessage[],
   });
   return newCode;
 }
 
-export async function getFixedFunction(options: {
-  target: string;
-  code: string;
-  request: string;
-  debug: boolean;
-  model?: string;
-  vision?: boolean;
-  failedReason?: string;
-}): Promise<string> {
+export async function getFixedCode(options: FixOptions): Promise<string> {
   const coder = buildCoder();
   const messages = coder.fix({
     code: options.code,
@@ -102,7 +88,6 @@ export async function getFixedFunction(options: {
   });
   return await requestCode({
     model: options.model,
-    vision: options.vision,
     debug: options.debug,
     messages: messages as ChatMessage[],
     expectedSize: Array.from(options.code).length

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { startBuilder } from "./builder/mod.ts";
 import { join, $ } from "./deps.ts";
-import { getFixedComponent, getFixedFunction, getNewComponent, getNewFunction } from "./fixer/mod.ts";
+import { getFixedComponent, getFixedCode, getNewComponent, getNewCode, FixOptions } from "./fixer/mod.ts";
 import { PrevisOptions } from "./options.ts";
 import { startBrowser } from "./screenshot/mod.ts";
 import { analyzeEnv, detectLibraryFromTargetPath, getTempFilepath, pxToNumber } from "./utils.ts";
@@ -22,7 +22,7 @@ export async function init(_options: PrevisOptions) {
 }
 
 export async function screenshot(options: PrevisOptions, target: string) {
-  const ssbr = await runScreenshotBrowser(options, target);
+  const ssbr = await runUI(options, target);
   await ssbr.screenshot();
   if (await hasCmd("imgcat")) {
     const width = options.width ? pxToNumber(options.width) : 400;
@@ -49,10 +49,10 @@ export async function fix(options: PrevisOptions, target: string) {
   }
   await Deno.copyFile(target, tempTarget);
 
-  let runner: Awaited<ReturnType<typeof runScreenshotBrowser>> | undefined = undefined;
+  let runner: Awaited<ReturnType<typeof runUI>> | undefined = undefined;
 
   if (uiMode) {
-    runner = await runScreenshotBrowser(options, target);
+    runner = await runUI(options, target);
     await runner.screenshot();
   }
 
@@ -74,34 +74,26 @@ export async function fix(options: PrevisOptions, target: string) {
     await Deno.remove(tempTarget);
     return;
   };
-  // let code = await Deno.readTextFile(tempTarget);
-  // let failedReason: string | undefined = undefined;
 
   if (!request) return;
   while (true) {
-    let newCode: string;
-    if (uiMode) {
-      newCode = await getFixedComponent({
-        code,
+    const fixOptions: FixOptions = {
+      code,
+      target,
+      model: options.model,
+      request: request!,
+      debug: !!options.debug,
+      failedReason,
+    };
+    const newCode = uiMode
+      ? await getFixedComponent({
+        ...fixOptions,
         vision,
         library,
         tailwind,
-        request: request!,
-        model: options.model,
-        debug: options.debug,
-        failedReason,
-        getImage: () => runner!.getImage(),
-      });
-    } else {
-      newCode = await getFixedFunction({
-        code,
-        target,
-        model: options.model,
-        request: request!,
-        debug: !!options.debug,
-        failedReason,
-      });
-    }
+        getImage: () => runner!.getBasey64Image(),
+      })
+      : await getFixedCode(fixOptions);
     if (options.testCommand) {
       const [cmd, ...args] = options.testCommand;
       const newArgs = args.map(s => s.replace('__FILE__', tempTarget));
@@ -160,13 +152,12 @@ export async function test(options: PrevisOptions, target: string) {
   }
 }
 
-
 export async function generate(options: PrevisOptions, target: string) {
   const uiMode = !target.endsWith(".ts");
 
   if (uiMode) {
     await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
-    const runner = await runScreenshotBrowser(options, target);
+    const runner = await runUI(options, target);
     const vision = !!options.vision;
     const tailwind = options.env.useTailwind;
     const library = await detectLibraryFromTargetPath(target) ?? options.env.libraryMode;
@@ -187,6 +178,7 @@ export async function generate(options: PrevisOptions, target: string) {
       debug: options.debug,
       model: options.model,
       vision,
+      getImage: () => runner.getBasey64Image(),
     });
 
     await Deno.writeTextFile(tempTarget, newCode);
@@ -209,7 +201,7 @@ export async function generate(options: PrevisOptions, target: string) {
     // first time
     const request = options.request ?? await options.getInput("What is this file?");
     if (!request) return;
-    const newCode = await getNewFunction({
+    const newCode = await getNewCode({
       model: options.model,
       target,
       request,
@@ -229,11 +221,11 @@ export async function generate(options: PrevisOptions, target: string) {
 }
 
 export async function serve(options: PrevisOptions, target: string) {
-  const builder = await runBuildServer(options, target);
+  const builder = await runBuilder(options, target);
   options.addHook(() => builder.end());
 }
 
-async function runBuildServer(options: PrevisOptions, target: string) {
+async function runBuilder(options: PrevisOptions, target: string) {
   const imports = options.import?.map(s => join(Deno.cwd(), s)) ?? []
   const port = Number(options.port || defaultPort);
   return await startBuilder({
@@ -244,9 +236,9 @@ async function runBuildServer(options: PrevisOptions, target: string) {
   });
 }
 
-async function runScreenshotBrowser(options: PrevisOptions, target: string) {
+async function runUI(options: PrevisOptions, target: string) {
   const tempTarget = getTempFilepath(target);
-  const builder = await runBuildServer(options, tempTarget);
+  const builder = await runBuilder(options, tempTarget);
   options.addHook(() => builder.end());
   const scale = options.scale ?? typeof options.scale === "string" ? Number(options.scale) : undefined;
   const tmpdir = Deno.makeTempDirSync();
@@ -271,7 +263,7 @@ async function runScreenshotBrowser(options: PrevisOptions, target: string) {
   options.addHook(async () => await browser.close());
   return {
     getScreenshotPath: () => screenshotPath,
-    async getImage() {
+    async getBasey64Image() {
       return await readFile(screenshotPath, 'base64');
     },
     async end() {
@@ -400,5 +392,13 @@ async function printCode(target: string) {
   } else {
     await $`cat ${target}`;
   }
+}
+
+function getViewContext(options: PrevisOptions, target: string) {
+  return {
+    uiMode: !target.endsWith(".ts"),
+    tailwind: options.env.useTailwind,
+    library: options.env.libraryMode,
+  };
 }
 
