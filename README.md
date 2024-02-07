@@ -2,33 +2,63 @@
 
 Interactive AI markup for frontend developpers.
 
-![previs example](ss.png)
+![demo](ss2.png)
 
 ## Install
 
+Install deno https://docs.deno.com/runtime/manual/getting_started/installation
+
 ```bash
-$ deno install -Af https://deno.land/x/previs@0.0.28/previs.ts
+$ deno install -Af https://deno.land/x/previs@0.0.29/previs.ts
 ```
 
-Optional dependencies
+## Requirements
 
-- bat (terminal code highlighter) https://github.com/sharkdp/bat
-- imgcat (print image in vscode/iterm2) https://iterm2.com/documentation-images.html
-- vscode's `settings.json`: `"terminal.integrated.enableImages": true`
+To preview in vscode terminal, you need imgcat and vscode settings.
+
+### imgcat
+
+```bash
+# cd under PATH
+$ wget https://iterm2.com/utilities/imgcat
+$ chmod +x imgcat
+```
+
+### vscode
+
+Launch command palette then `Preferences: Open User Settings (JSON)`
+
+```jsonc
+{
+  // ...
+  "terminal.integrated.enableImages": true,
+}
+```
+
 
 ## How to use
 
-At first, check with `previs doctor`.
+Previs works on vite project.
 
 ```bash
-# Set PREVIS_OPENAI_API_KEY in your env
-$ export PREVIS_OPENAI_API_KEY=...
-
-# Create vite project
 $ npm create vite@latest
 # I recommend react-ts template
+# cd <proj>
+```
 
-# cd <project>
+(TODO: previs use vite but ignore project's vite.config.*)
+
+Set `PREVIS_OPENAI_API_KEY`.
+
+```bash
+$ export PREVIS_OPENAI_API_KEY=...
+# or OPENAI_API_KEY
+```
+
+
+Check with `previs doctor`.
+
+```bash
 $ previs doctor
 ✅ git
 ✅ code
@@ -42,6 +72,8 @@ $ previs doctor
 Library: react
 Base: ./
 ```
+
+Run preview and fix interactively.
 
 ```bash
 # Fix
@@ -58,46 +90,21 @@ $ previs src/button.tsx -w 400px
 
 # Generate new file
 $ previs newfile.tsx
+
+# Fix with test validation
+$ previs src/button.tsx -- pnpm vitest --run __FILE__
 ```
 
-### Previs Preview Convension
+### Previs preview convension (React)
 
 Put single file for preview in vite project.
 
-- exported `__PREVIEW__`
-- exported `default`
-- Same symbol of filename(caseless)
-
-Examples.
-
-```tsx
-export default function Button() {
-  const buttonStyle = {
-    backgroundColor: 'red',
-    color: 'white',
-  };
-  return <button type="button" style={buttonStyle}>Click me</button>
-}
-```
-
-Same filename (caseless)
-
-```tsx
-// Button.tsx
-export function Button() {
-  return <button type="button" style={buttonStyle}>Click me</button>
-}
-```
-
-`__PREVIEW__`
-
-```tsx
-// __PREVIEW__: best priority.
-export function __PREVIEW__() {
-  return <>...</>
-}
-```
-
+1. exported `__PREVIEW__`
+  - `export function __PREVIEW__(/* no props */) {}`
+2. Same symbol of filename(caseless)
+  - `Button.tsx` => `export function Button() {...}`
+3. exported `default`
+  - `export default function App() {...}`
 
 ### Run with test
 
@@ -107,6 +114,19 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
 ```
 
 `__FILE__` is replaced to generated temp file. (eg. `button.__previs__.tsx`)
+
+## How it works
+
+- Create temporal vite porject under `.previs-*`
+- Run `vite` server in deno
+- Run `puppeteer` and take screenshot
+- Print screenshot by imgcat and `vscode` terminal image integration
+- Build prompt with current code and fixing request
+- Send prompt to openai api to generate new code
+- Print screenshot again
+- `previs <options> -- [test-command]`: Run test and retry automatically
+- `previs --vision`: Send screenshot to openai
+- Accepet generated code or add additional request
 
 ## TODO
 
@@ -134,9 +154,9 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
   - [ ] panda-css
 - [x] load tailwind config
 - [x] format
+- [ ] Load custom vite.config
 - [ ] Zero config tailwind
 - [ ] Load `previs.config.json`
-- [ ] Load specified vite.config by options
 - [x] width/height
 - [x] show diff
 - [ ] Web UI
