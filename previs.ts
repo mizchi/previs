@@ -96,7 +96,7 @@ async function cleanTempFiles(dir: string) {
 }
 
 // run
-if (options.values.help) {
+if (options.positionals.length === 0 || options.values.help) {
   help();
   Deno.exit(0);
 }

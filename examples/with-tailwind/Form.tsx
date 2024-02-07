@@ -1,92 +1,70 @@
-import React, { useState } from "react";
+import React from "react";
 
-export default function SimpleForm() {
-  // Using useState to handle form field values
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    message: "",
-  });
+export interface FormProps {
+  onSubmit: (data: { [key: string]: any }) => void;
+}
 
-  // Handle form field changes and update the state
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prevState) => ({ ...prevState, [name]: value }));
-  };
-
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real-world app, you would typically handle the form submission here
-    console.log("Form Data Submitted:", formData);
+export default function FancyForm({ onSubmit }: FormProps) {
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const data = Array.from(formData.entries()).reduce((acc, [key, value]) => {
+      acc[key] = value;
+      return acc;
+    }, {} as { [key: string]: any });
+    onSubmit(data);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <label
-          htmlFor="name"
-          className="block text-sm font-medium text-gray-700"
-        >
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-4 bg-white shadow-lg rounded-lg p-8"
+    >
+      <div className="form-group">
+        <label htmlFor="name" className="font-bold text-gray-700">
           Name
         </label>
         <input
           type="text"
           id="name"
           name="name"
-          value={formData.name}
-          onChange={handleChange}
-          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          placeholder="Your name"
+          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+          required
         />
       </div>
-      <div>
-        <label
-          htmlFor="email"
-          className="block text-sm font-medium text-gray-700"
-        >
-          Email address
+      <div className="form-group">
+        <label htmlFor="email" className="font-bold text-gray-700">
+          Email
         </label>
         <input
           type="email"
           id="email"
           name="email"
-          value={formData.email}
-          onChange={handleChange}
-          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          placeholder="you@example.com"
+          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+          required
         />
       </div>
-      <div>
-        <label
-          htmlFor="message"
-          className="block text-sm font-medium text-gray-700"
-        >
+      <div className="form-group">
+        <label htmlFor="message" className="font-bold text-gray-700">
           Message
         </label>
         <textarea
           id="message"
           name="message"
-          value={formData.message}
-          onChange={handleChange}
+          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
           rows={4}
-          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          placeholder="Your message"
         ></textarea>
       </div>
       <button
         type="submit"
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        className="inline-flex justify-center items-center px-4 py-2 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
       >
-        Send
+        Submit
       </button>
     </form>
   );
 }
 
-// __PREVIEW__ component for checking without props
 export function __PREVIEW__() {
-  return <SimpleForm />;
+  return <FancyForm onSubmit={console.log} />;
 }

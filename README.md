@@ -159,6 +159,7 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
 - [ ] Load `previs.config.json`
 - [x] width/height
 - [x] show diff
+- [ ] Autoload src/index.css
 - [ ] Web UI
 - [ ] VRT
 - [ ] testing library sample
