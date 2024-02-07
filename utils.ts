@@ -121,6 +121,9 @@ export async function detectLibraryFromTargetPath(filepath: string): Promise<Lib
   } else if (filepath.endsWith('.vue')) {
     return 'vue';
   } else if (filepath.endsWith('.tsx') || filepath.endsWith('.jsx')) {
+    if (!await exists(filepath)) {
+      return undefined;
+    }
     const content = await Deno.readTextFile(filepath);
     const jsxPragma = findJsxPragma(content);
     if (jsxPragma === 'preact') {
@@ -222,4 +225,16 @@ Deno.test('getExportedComponent', () => {
 
 export function pxToNumber(str: string): number {
   return Number(str.replace('px', ''));
+}
+
+export function pick<Data extends object, Keys extends keyof Data>(
+  data: Data,
+  keys: Keys[]
+): Pick<Data, Keys> {
+  const result = {} as Pick<Data, Keys>;
+  for (const key of keys) {
+    result[key] = data[key];
+  }
+
+  return result;
 }

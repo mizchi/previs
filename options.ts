@@ -48,7 +48,7 @@ const argsOptions = {
     type: 'boolean',
     short: 'r',
   },
-  noDiff: {
+  noPrint: {
     type: 'boolean',
   },
   port: {

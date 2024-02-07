@@ -41,7 +41,7 @@ const __queue = options.values.queue ? options.values.queue.split(",").map(s => 
 async function getInput(message: string): Promise<string | undefined> {
   if (Array.isArray(__queue)) return __queue.shift();
   const result = await $.prompt(message);
-  console.log(`${message}: ${result}`);
+  console.log(`${message} ${result}`);
   return result;
 }
 async function getConfirm(message: string): Promise<boolean> {
