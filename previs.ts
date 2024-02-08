@@ -6,7 +6,7 @@ let base = Deno.cwd();
 try {
   const ctx = await getProjectContext(base);
   base = ctx.base;
-  const options = await buildOptions(base, Deno.args);
+  const options = buildOptions(base, Deno.args);
   await cleanup(ctx.base);
   const cmd = commands[options.command];
   if (cmd) {

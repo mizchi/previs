@@ -1,5 +1,5 @@
 export default function Button() {
-  // Changed the button background color from red to blue as per the latest request
+  // Changed the button background color from red to blue as per the user request
   return (
     <button
       type="button"

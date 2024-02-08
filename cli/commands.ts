@@ -1,11 +1,10 @@
-import { readFile } from 'node:fs/promises';
 import { startBuilder } from "../builder/mod.ts";
-import { join, $ } from "../deps.ts";
+import { join, $, exists } from "../deps.ts";
 import { getFixedComponent, getFixedCode, getNewComponent, getNewCode, FixOptions } from "../fixer/mod.ts";
 import { CLIOptions, getHelpText } from "./options.ts";
-import { startBrowser } from "../screenshot/mod.ts";
 import { formatFilepath, getTempFilepath, pxToNumber } from "../utils.ts";
 import { ProjectContext, getProjectContext, getTargetContext } from "./context.ts";
+import { startPresenter } from "./presenter.ts";
 
 const defaultPort = "3434";
 
@@ -15,65 +14,129 @@ export async function init(_options: CLIOptions, _ctx: ProjectContext) {
 }
 
 export async function screenshot(options: CLIOptions, _ctx: ProjectContext) {
-  await using ui = await runUI(options);
-  await ui.screenshot();
+  await using presenter = await startPresenter(options.target!, options);
+  await presenter.screenshot();
   if (await hasCmd("imgcat")) {
     const width = options.width ? pxToNumber(options.width) : 400;
-    await $`imgcat -W ${width}px ${ui.getScreenshotPath()}`;
+    await $`imgcat -W ${width}px ${presenter.getScreenshotPath()}`;
   }
 }
 
 export async function fix(options: CLIOptions, ctx: ProjectContext) {
-  const target = options.target!;
-  const uiMode = !target.endsWith(".ts");
+  const originalTarget = options.target!;
+  const uiMode = !originalTarget.endsWith(".ts");
   const vision = !!options.vision && uiMode;
-  const tempTarget = getTempFilepath(target);
+  const tempTarget = getTempFilepath(originalTarget);
   const tailwind = ctx.useTailwind;
-  const library = await getTargetContext(target) ?? ctx.libraryMode;
+  const library = await getTargetContext(originalTarget) ?? ctx.libraryMode;
   const auto = options.auto;
 
-  console.log("[previs:detect]", {
-    tailwind,
-    library,
-  });
-
+  // validation
   if (auto && !options.testCmd) {
     throw new Error("testCmd is required for auto mode");
   }
-  await Deno.copyFile(target, tempTarget);
-
-  await using ui = uiMode ? await runUI(options) : null;
-  await ui?.screenshot();
-
-  let code = await Deno.readTextFile(tempTarget);
+  let currentCode = "";
+  let currentRequest: string | undefined = options.request;
   let errorText: string | undefined = undefined;
+  const preExists = await exists(originalTarget);
 
-  if (options.testCmd) {
-    const result = await runTest({ testCmd: options.testCmd, target: tempTarget });
-    if (result.code === 0) {
-      // test passed
+  // fix mode
+  if (preExists) {
+    currentCode = await Deno.readTextFile(originalTarget);
+  } else {
+    console.log('previs: entering generation mode');
+    // generation mode
+    const newRequest = currentRequest ?? ctx.getInput("new>");
+    if (!newRequest) {
+      return;
+    }
+    // consnume
+    if (currentRequest) {
+      currentRequest = undefined;
+    }
+    if (uiMode) {
+      currentCode = await getNewComponent({
+        target: originalTarget,
+        request: newRequest!,
+        tailwind,
+        library: library,
+        debug: options.debug,
+        model: options.model,
+        vision,
+        getImage: () => ui?.getBase64Image()!,
+      });
     } else {
-      errorText = result.stderr;
+      currentCode = await getNewCode({
+        model: options.model,
+        target: originalTarget,
+        request: newRequest!,
+        debug: !!options.debug,
+      });
+      if (options.testCmd) {
+        const result = await runTest(originalTarget, { testCmd: options.testCmd });
+        errorText = result.code === 0 ? undefined : result.stderr;
+      }
     }
   }
 
-  let request = options.request ?? auto ? "Pass tests" : ctx.getInput("fix>");
-  if (!request) {
-    await Deno.remove(tempTarget);
-    return;
-  };
+  // validation
+  if (auto && !uiMode) {
+    throw new Error("auto mode is only supported for ui mode");
+  }
+
+  // create temp file and run test
+  {
+    await Deno.writeTextFile(tempTarget, currentCode);
+
+    // run test
+    if (options.testCmd) {
+      const result = await runTest(tempTarget, { testCmd: options.testCmd });
+      errorText = result.code === 0 ? undefined : result.stderr;
+    }
+  }
+
+  // start presenter
+  await using ui = uiMode ? await startPresenter(tempTarget, options) : null;
+  await Deno.writeTextFile(tempTarget, currentCode);
+  await ui?.screenshot();
+  if (!uiMode) {
+    await printCode(tempTarget);
+  }
+
+  let request;
+  // inintial request for existing file
+  if (preExists) {
+    request = currentRequest ?? auto ? "Pass tests" : ctx.getInput("fix>");
+    if (!request) {
+      await Deno.remove(tempTarget);
+      return;
+    };
+  } else {
+    request = currentRequest ?? ctx.getInput("Accept? [y/n/<fix>]");
+    if (request?.toLowerCase() === "y") {
+      // Overwrite original
+      await Deno.rename(tempTarget, originalTarget);
+      return;
+    }
+    if (request?.toLowerCase() === "n") {
+      await Deno.remove(tempTarget);
+      return;
+    }
+  }
 
   if (!request) return;
+
+  // start fixing loop
   while (true) {
     const fixOptions: FixOptions = {
-      code,
-      target,
+      code: currentCode,
+      target: originalTarget,
       model: options.model,
       request: request!,
       debug: !!options.debug,
       errorText,
     };
-    const newCode = uiMode
+    currentCode = uiMode
       ? await getFixedComponent({
         ...fixOptions,
         vision,
@@ -82,42 +145,41 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
         getImage: () => ui!.getBase64Image(),
       })
       : await getFixedCode(fixOptions);
+    // save and screenshot
+    await Deno.writeTextFile(tempTarget, currentCode);
+
+    // run test for temp file
     if (options.testCmd) {
-      const [cmd, ...args] = options.testCmd;
-      const newArgs = args.map(s => s.replace('__FILE__', tempTarget));
-      const testResult = await $`${cmd} ${newArgs}`.noThrow();
-      if (testResult.code === 0) {
-        console.log("[previs] test passed");
-        errorText = undefined;
-      } else {
-        // test failed
-        console.log("[previs] test failed");
-        errorText = testResult.stderr;
-        code = newCode;
+      const testResult = await runTest(tempTarget, { testCmd: options.testCmd });
+      errorText = testResult.code === 0 ? undefined : testResult.stderr;
+      if (errorText) {
         continue;
-        // TODO: retry
       }
     }
-    // save and screenshot
-    await Deno.writeTextFile(tempTarget, newCode);
+
+    // display screenshot
     await ui?.screenshot();
+    if (!options.noPrint && await hasCmd("git")) {
+      await $`git --no-pager diff --no-index --color=always ${originalTarget} ${tempTarget}`.noThrow();
+    }
 
-    // pass 
+    // if autoMode, overwrite original and exit
     if (auto) {
-      await Deno.rename(tempTarget, target);
+      await Deno.rename(tempTarget, originalTarget);
       break;
     }
-
-    request = ctx.getInput("Accept? [y/N/<request>]");
-    if (request === "y") {
-      await Deno.rename(tempTarget, target);
+    // get new request
+    request = ctx.getInput("Accept? [y/n/<fix>]");
+    if (request?.toLowerCase() === "y") {
+      // Overwrite original
+      await Deno.rename(tempTarget, originalTarget);
       break;
     }
-    if (request === "N") {
+    if (request?.toLowerCase() === "n") {
       await Deno.remove(tempTarget);
       break;
     }
-    code = newCode;
+    // currentCode = newCode;
   }
 }
 
@@ -128,7 +190,6 @@ export async function test(options: CLIOptions, _ctx: ProjectContext) {
   const [cmd, ...args] = options.testCmd;
   const newArgs = args.map(s => s.replace('__FILE__', options.target!));
 
-  // console.log(`[previs] Testing ${target} with ${cmd} ${newArgs.join(' ')}`);
   const testResult = await $`${cmd} ${newArgs}`.noThrow();
   if (testResult.code === 0) {
     console.log("[previs] test passed");
@@ -138,73 +199,6 @@ export async function test(options: CLIOptions, _ctx: ProjectContext) {
   }
 }
 
-export async function generate(options: CLIOptions, ctx: ProjectContext) {
-  const target = options.target!;
-  const uiMode = !target.endsWith(".ts");
-
-  if (uiMode) {
-    await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
-    await using runner = await runUI(options);
-    const vision = !!options.vision;
-    const tailwind = ctx.useTailwind;
-    const library = await getTargetContext(target) ?? ctx.libraryMode;
-
-    console.log("[previs:detect]", {
-      tailwind,
-      library,
-    });
-
-    const tempTarget = getTempFilepath(target);
-    const request = options.request ?? ctx.getInput("What is this file?");
-    if (!request) return;
-    const newCode = await getNewComponent({
-      target,
-      request,
-      tailwind,
-      library: library,
-      debug: options.debug,
-      model: options.model,
-      vision,
-      getImage: () => runner.getBase64Image(),
-    });
-
-    await Deno.writeTextFile(tempTarget, newCode);
-    if (!options.noPrint) {
-      await printCode(tempTarget);
-    }
-    await runner.screenshot();
-    const accepted = options.yes ?? ctx.getConfirm("Accept?");
-    if (accepted) {
-      await Deno.rename(tempTarget, target);
-    } else {
-      await Deno.remove(tempTarget);
-    }
-  } else {
-    // non-ui mode
-    await Deno.writeTextFile(target, 'export default function () {}');
-
-    const tempTarget = getTempFilepath(target);
-    // first time
-    const request = options.request ?? ctx.getInput("What is this file?");
-    if (!request) return;
-    const newCode = await getNewCode({
-      model: options.model,
-      target,
-      request,
-      debug: !!options.debug,
-    });
-    await Deno.writeTextFile(tempTarget, newCode);
-    if (!options.noPrint) {
-      await printCode(tempTarget);
-    }
-    const accepted = options.yes ?? ctx.getConfirm("Accept?");
-    if (accepted) {
-      await Deno.rename(tempTarget, target);
-    } else {
-      await Deno.remove(tempTarget);
-    }
-  }
-}
 
 export async function serve(options: CLIOptions, _ctx: ProjectContext) {
   const target = options.target!;
@@ -219,60 +213,10 @@ export async function serve(options: CLIOptions, _ctx: ProjectContext) {
   });
 }
 
+// deno-lint-ignore require-await
 export async function help(_options: CLIOptions, _ctx: ProjectContext) {
   const helpText = getHelpText();
   console.log(helpText);
-}
-
-async function runUI(options: CLIOptions) {
-  const tempTarget = getTempFilepath(options.target!);
-  const imports = options.import?.map(s => join(Deno.cwd(), s)) ?? []
-
-  const builder = await startBuilder({
-    cwd: Deno.cwd(),
-    target: tempTarget,
-    imports,
-    port: Number(options.port || defaultPort),
-  });
-  const scale = options.scale ?? typeof options.scale === "string" ? Number(options.scale) : undefined;
-  const tmpdir = Deno.makeTempDirSync();
-  const screenshotPath = join(tmpdir, "ss.png");
-  const port = Number(options.port || defaultPort);
-  const screenshotUrl = `http://localhost:${port}/`;
-  await builder.ensureBuild();
-  const onScreenshot = async () => {
-    if (await hasCmd("imgcat")) {
-      const width = options.width ? pxToNumber(options.width) : 400;
-      await $`imgcat -W ${width}px ${screenshotPath}`;
-    } else if (await hasCmd("code")) {
-      await $`code ${screenshotPath}`;
-    }
-  };
-  const browser = await startBrowser({
-    width: options.width,
-    height: options.height,
-    screenshotPath,
-    onScreenshot,
-    scale,
-    debug: options.debug
-  });
-  return {
-    getScreenshotPath: () => screenshotPath,
-    async getBase64Image() {
-      return await readFile(screenshotPath, 'base64');
-    },
-    screenshot: async () => {
-      await builder.ensureBuild();
-      await browser.screenshot(screenshotUrl);
-      if (!options.noPrint) {
-        await $`git --no-pager diff --no-index --color=always ${options.target!} ${tempTarget}`.noThrow();
-      }
-    },
-    async [Symbol.asyncDispose]() {
-      builder.dispose();
-      await browser.dispose();
-    },
-  }
 }
 
 export async function doctor(_options: CLIOptions) {
@@ -346,9 +290,9 @@ export async function doctor(_options: CLIOptions) {
 }
 
 
-async function runTest(options: { testCmd: string[], target: string }) {
+async function runTest(target: string, options: { testCmd: string[] }) {
   const [cmd, ...args] = options.testCmd;
-  const newArgs = args.map(s => s.replace('__FILE__', options.target));
+  const newArgs = args.map(s => s.replace('__FILE__', target));
   const testResult = await $`${cmd} ${newArgs}`.noThrow();
   return testResult;
 }

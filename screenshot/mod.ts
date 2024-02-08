@@ -59,17 +59,40 @@ export async function startBrowser(options: {
       }
     },
     async screenshot(url: string) {
+      // console.log('[previs:browser:screenshot]', url);
       if (!initialized) {
         await page.goto(url);
         initialized = true;
       } else {
         await page.reload();
       }
-      const result = await waitUntillExecuted(page);
-      if (!result.ok) {
-        console.error('[previs:browser:error]', result.error);
-      }
+
+      let done = false;
+      // TODO: detect build error
+      await Promise.race([
+        waitUntillExecuted(page).then((result) => {
+          if (!result.ok) {
+            console.error('[previs:browser:error]', result.error);
+          }
+          done = true;
+        }),
+        new Promise((resolve) => {
+          setTimeout(() => {
+            if (!done) {
+              console.error('[previs:browser:timeout]');
+            }
+            resolve(undefined);
+          }, 1500);
+        })
+      ]);
+      // const result = await waitUntillExecuted(page);
+      // if (!result.ok) {
+      //   console.error('[previs:browser:error]', result.error);
+      // }
+
+      // console.log('[previs:browser:ready]');
       const size = await this._getRootSize();
+      console.log('[previs:browser:size]', size);
       const explicitDisplaySize = !!options.width || !!options.height;
       if (explicitDisplaySize) {
         const width = options.height ? pxToNumber(options.height) : size.width;

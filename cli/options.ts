@@ -1,4 +1,4 @@
-import { exists, join, parseArgs } from "../deps.ts";
+import { join, parseArgs } from "../deps.ts";
 
 const CMDS = [
   "help",
@@ -8,9 +8,6 @@ const CMDS = [
   "screenshot",
   "ss",
   "fix",
-  "g",
-  "gen",
-  "generate",
   "serve",
 ];
 
@@ -125,7 +122,7 @@ export function getHelpText() {
 
 export type CLIOptions = Awaited<ReturnType<typeof buildOptions>>;
 
-export async function buildOptions(cwd: string, args: string[]) {
+export function buildOptions(cwd: string, args: string[]) {
   const splitIndex = args.indexOf("--");
   const previsArgs = args.slice(0, splitIndex === -1 ? args.length : splitIndex);
   const testCmd = splitIndex === -1 ? undefined : args.slice(splitIndex + 1);
@@ -149,11 +146,7 @@ export async function buildOptions(cwd: string, args: string[]) {
     }
   } else {
     target = join(cwd, first);
-    if (await exists(target)) {
-      command = "fix";
-    } else {
-      command = "gen"
-    }
+    command = "fix";
   }
 
   return {
