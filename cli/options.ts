@@ -1,5 +1,18 @@
-import { parseArgs } from "./deps.ts";
-import { AnalyzedEnv } from "./utils.ts";
+import { exists, join, parseArgs } from "../deps.ts";
+import { getProjectContext, ProjectContext } from "./context.ts";
+
+const CMDS = [
+  "doctor",
+  "init",
+  "test",
+  "screenshot",
+  "ss",
+  "fix",
+  "g",
+  "gen",
+  "generate",
+  "serve",
+];
 
 const argsOptions = {
   help: {
@@ -72,13 +85,15 @@ Examples:
 `;
 
 export type PrevisOptions = ReturnType<typeof getParsedArgs>['values'] & {
-  env: AnalyzedEnv;
+  env: ProjectContext;
   testCommand?: string[];
   getInput: (message: string) => string | undefined;
   getConfirm: (message: string) => boolean;
+  target: string | undefined;
+  command: string;
 };
 
-export function getParsedArgs(args: string[]) {
+function getParsedArgs(args: string[]) {
   const splitIndex = args.indexOf("--");
   if (splitIndex === -1) {
     const parsed = parseArgs({
@@ -117,3 +132,56 @@ export function help() {
   console.log(help);
 }
 
+function getInput(message: string): string | undefined {
+  const handler = () => {
+    // ignore
+  };
+  Deno.addSignalListener('SIGINT', handler);
+  const ret = prompt(message);
+  Deno.removeSignalListener('SIGINT', handler);
+  if (ret === null) return undefined;
+  return ret;
+}
+
+function getConfirm(message: string): boolean {
+  const out = prompt(`${message} [y/n]`);
+  if (out === null || out.toLowerCase() === 'n') {
+    return false;
+  }
+  return out.toLowerCase() === 'y';
+}
+
+export async function buildOptions(cwd: string, args: string[]): Promise<PrevisOptions> {
+  const options = getParsedArgs(args);
+  const env = await getProjectContext(cwd);
+
+  const first = options.positionals[0];
+
+  let command: string;
+  let target: string | undefined = undefined;
+  if (CMDS.includes(first)) {
+    command = first;
+    if (options.positionals[1]) {
+      target = join(cwd, options.positionals[1]);
+    }
+  } else {
+    target = join(cwd, first);
+    if (await exists(target)) {
+      command = "fix";
+    } else {
+      command = "gen"
+    }
+  }
+
+  const previsOptions: PrevisOptions = {
+    ...options.values,
+    testCommand: options.testCommand,
+    env,
+    getInput,
+    getConfirm,
+    target: target,
+    command,
+  };
+
+  return previsOptions;
+}

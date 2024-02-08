@@ -1,203 +1,4 @@
-import { dirname, exists, join, parseJsonc, extname, basename, expect } from "./deps.ts";
-
-const VITE_CONFIG_EXTENTIONS = [
-  '.ts',
-  '.js',
-  '.mjs',
-  '.mts',
-];
-
-type LibraryMode = "react" | "preact" | "qwik" | "svelte" | "vue" | "vanilla";
-
-const JSX_PRAGMA_REGEX = /@jsxImportSource\s+[^\s\*]+/;
-
-export async function findClosest(cwd: string, checker: (currentDir: string) => Promise<string | undefined>): Promise<{
-  dir: string;
-  path: string;
-} | undefined> {
-  let currentDir = cwd;
-  while (currentDir !== "/") {
-    const found = await checker(currentDir);
-    if (found) {
-      return {
-        dir: currentDir,
-        path: found,
-      }
-    }
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-    currentDir = parentDir;
-  }
-  return undefined;
-}
-
-export async function findViteProjectDirectory(cwd: string) {
-  const viteChecker = async (currentDir: string) => {
-    for (const ext of VITE_CONFIG_EXTENTIONS) {
-      const configPath = join(currentDir, `vite.config${ext}`);
-      if (await exists(configPath)) {
-        return configPath;
-      }
-    }
-    return undefined;
-  };
-  return await findClosest(cwd, viteChecker);
-}
-
-export async function findNodeModulesDirectory(cwd: string) {
-  const modulesChecker = async (currentDir: string) => {
-    const configPath = join(currentDir, `node_modules`);
-    if (await exists(configPath)) {
-      return configPath;
-    }
-    return undefined;
-  };
-  return await findClosest(cwd, modulesChecker);
-}
-
-export async function findVscodeSettingsDirectory(cwd: string) {
-  const viteChecker = async (currentDir: string) => {
-    const vscodePath = join(currentDir, `.vscode`);
-    if (await exists(vscodePath)) {
-      return vscodePath;
-    }
-    return undefined;
-  };
-  return await findClosest(cwd, viteChecker);
-}
-
-export async function findPackageJson(cwd: string) {
-  const packageJsonChecker = async (currentDir: string) => {
-    const configPath = join(currentDir, 'package.json');
-    if (await exists(configPath)) {
-      return configPath;
-    }
-    return undefined;
-  };
-  return await findClosest(cwd, packageJsonChecker);
-}
-
-export async function findTsconfigJson(cwd: string) {
-  const packageJsonChecker = async (currentDir: string) => {
-    const configPath = join(currentDir, 'tsconfig.json');
-    if (await exists(configPath)) {
-      return configPath;
-    }
-    return undefined;
-  };
-  return await findClosest(cwd, packageJsonChecker);
-}
-
-export async function findTailwindConfig(cwd: string) {
-  const packageJsonChecker = async (currentDir: string) => {
-    const configPath = join(currentDir, 'tailwind.config.js');
-    if (await exists(configPath)) {
-      return configPath;
-    }
-    return undefined;
-  };
-  return await findClosest(cwd, packageJsonChecker);
-}
-
-export async function findGitignore(cwd: string) {
-  const packageJsonChecker = async (currentDir: string) => {
-    const configPath = join(currentDir, '.gitignore');
-    if (await exists(configPath)) {
-      return configPath;
-    }
-    return undefined;
-  };
-  return await findClosest(cwd, packageJsonChecker);
-}
-
-export async function detectLibraryFromTargetPath(filepath: string): Promise<LibraryMode | undefined> {
-  // TODO: Solid
-  // TODO: htmx
-  // TODO: html
-  if (filepath.endsWith('.svelte')) {
-    return 'svelte';
-  } else if (filepath.endsWith('.vue')) {
-    return 'vue';
-  } else if (filepath.endsWith('.tsx') || filepath.endsWith('.jsx')) {
-    if (!await exists(filepath)) {
-      return undefined;
-    }
-    const content = await Deno.readTextFile(filepath);
-    const jsxPragma = findJsxPragma(content);
-    if (jsxPragma === 'preact') {
-      return 'preact';
-    }
-    if (jsxPragma === '@builder.io/qwik') {
-      return 'qwik';
-    }
-  }
-  return undefined;
-
-  function findJsxPragma(content: string) {
-    const jsxPragma = JSX_PRAGMA_REGEX.exec(content);
-    if (jsxPragma) {
-      const source = jsxPragma[0].split(" ")[1];
-      return source;
-    }
-    return undefined;
-  }
-}
-
-export type AnalyzedEnv = Awaited<ReturnType<typeof analyzeEnv>>;
-export async function analyzeEnv(cwd: string) {
-  const viteDir = await findViteProjectDirectory(cwd);
-  const gitignore = await findGitignore(cwd);
-  // const nodeModulesDir = await findNodeModulesDirectory(cwd);
-  // const vscodeDir = await findVscodeSettingsDirectory(cwd);
-  const packageJson = await findPackageJson(cwd);
-  const tailwindConfig = await findTailwindConfig(cwd);
-  const tsconfig = await findTsconfigJson(cwd);
-
-  const useTailwind = tailwindConfig?.path ? true : false;
-  let isReactJsx = false;
-  let libraryMode: LibraryMode = "react";
-  if (tsconfig?.path) {
-    const content = await Deno.readTextFile(tsconfig.path);
-    const config = parseJsonc(content, {
-      allowTrailingComma: true,
-    });
-    // @ts-ignore unchecked json
-    if (config.compilerOptions?.jsx) {
-      libraryMode = "react";
-    }
-    // @ts-ignore unchecked json
-    if (config.compilerOptions?.jsxImportSource === "preact") {
-      libraryMode = "preact";
-    }
-    // @ts-ignore unchecked json
-    if (config.compilerOptions?.jsxImportSource === "@builder.io/qwik") {
-      libraryMode = "qwik";
-    }
-
-    // @ts-ignore unchecked json
-    if (config.compilerOptions?.jsx === "react-jsx") {
-      // this is active on react and qwik
-      isReactJsx = true;
-    }
-  }
-  const base = viteDir?.dir ?? packageJson?.dir ?? cwd;
-  return {
-    base,
-    cwd,
-    gitignore,
-    viteDir,
-    tsconfig,
-    useTailwind,
-    // nodeModulesDir,
-    // vscodeDir,
-    isReactJsx,
-    packageJson,
-    // tailwindConfig,
-    libraryMode,
-  };
-}
+import { basename, dirname, expect, extname, join } from "./deps.ts";
 
 export function getTempFilepath(filepath: string) {
   const ext = extname(filepath);
@@ -205,6 +6,7 @@ export function getTempFilepath(filepath: string) {
   const newPath = join(dirname(filepath), base.replace(ext, `.__previs__${ext}`));
   return newPath;
 }
+
 Deno.test('getTempFilepath', () => {
   expect(getTempFilepath('/tmp/foo/bar.ts')).toEqual('/tmp/foo/bar.__previs__.ts');
   expect(getTempFilepath('/tmp/foo/bar.test.ts')).toEqual('/tmp/foo/bar.test.__previs__.ts');
@@ -216,6 +18,7 @@ export function getExportedComponent(filepath: string) {
   const base = basename(filepath);
   return base.replace(ext, '').replace(/\-/g, '').split('.')[0].toLowerCase();
 }
+
 Deno.test('getExportedComponent', () => {
   expect(getExportedComponent('/tmp/button.tsx')).toEqual('button');
   expect(getExportedComponent('/tmp/button-xxx.tsx')).toEqual('buttonxxx');
@@ -239,17 +42,16 @@ export function pick<Data extends object, Keys extends keyof Data>(
   return result;
 }
 
-export function formatFilepath(cwd: string, path: string) {
-  if (path === cwd) {
+export function formatFilepath(base: string, filepath: string) {
+  if (filepath === base) {
     return './';
   }
-  if (path.startsWith(cwd)) {
-    const out = path.replace(cwd + '/', './');
-    return out;
+  if (filepath.startsWith(base)) {
+    return filepath.replace(base + '/', './');
   } else {
-    if (path.startsWith(Deno.env.get("HOME")!)) {
-      return path.replace(Deno.env.get("HOME")!, '~');
+    if (filepath.startsWith(Deno.env.get("HOME")!)) {
+      return filepath.replace(Deno.env.get("HOME")!, '~');
     }
-    return path;
+    return filepath;
   }
 }

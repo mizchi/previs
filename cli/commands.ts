@@ -1,10 +1,13 @@
 import { readFile } from 'node:fs/promises';
-import { startBuilder } from "./builder/mod.ts";
-import { join, $ } from "./deps.ts";
-import { getFixedComponent, getFixedCode, getNewComponent, getNewCode, FixOptions } from "./fixer/mod.ts";
+import { startBuilder } from "../builder/mod.ts";
+import { join, $ } from "../deps.ts";
+import { getFixedComponent, getFixedCode, getNewComponent, getNewCode, FixOptions } from "../fixer/mod.ts";
 import { PrevisOptions } from "./options.ts";
-import { startBrowser } from "./screenshot/mod.ts";
-import { analyzeEnv, detectLibraryFromTargetPath, formatFilepath, getTempFilepath, pxToNumber } from "./utils.ts";
+import { startBrowser } from "../screenshot/mod.ts";
+// import { analyzeEnv, detectLibraryFromTargetPath, formatFilepath, getTempFilepath, pxToNumber } from "../utils.ts";
+import { formatFilepath, getTempFilepath, pxToNumber } from "../utils.ts";
+import { getProjectContext, getTargetContext } from "./context.ts";
+
 
 const defaultPort = "3434";
 
@@ -35,7 +38,7 @@ export async function fix(options: PrevisOptions, target: string) {
   const vision = !!options.vision && uiMode;
   const tempTarget = getTempFilepath(target);
   const tailwind = options.env.useTailwind;
-  const library = await detectLibraryFromTargetPath(target) ?? options.env.libraryMode;
+  const library = await getTargetContext(target) ?? options.env.libraryMode;
   const auto = options.auto;
 
   console.log("[previs:detect]", {
@@ -52,14 +55,14 @@ export async function fix(options: PrevisOptions, target: string) {
   await ui?.screenshot();
 
   let code = await Deno.readTextFile(tempTarget);
-  let failedReason: string | undefined = undefined;
+  let errorText: string | undefined = undefined;
 
   if (options.testCommand) {
     const result = await runTest({ testCommand: options.testCommand, target: tempTarget });
     if (result.code === 0) {
       // test passed
     } else {
-      failedReason = result.stderr;
+      errorText = result.stderr;
     }
   }
 
@@ -77,7 +80,7 @@ export async function fix(options: PrevisOptions, target: string) {
       model: options.model,
       request: request!,
       debug: !!options.debug,
-      failedReason,
+      errorText,
     };
     const newCode = uiMode
       ? await getFixedComponent({
@@ -94,11 +97,11 @@ export async function fix(options: PrevisOptions, target: string) {
       const testResult = await $`${cmd} ${newArgs}`.noThrow();
       if (testResult.code === 0) {
         console.log("[previs] test passed");
-        failedReason = undefined;
+        errorText = undefined;
       } else {
         // test failed
         console.log("[previs] test failed");
-        failedReason = testResult.stderr;
+        errorText = testResult.stderr;
         code = newCode;
         continue;
         // TODO: retry
@@ -152,7 +155,7 @@ export async function generate(options: PrevisOptions, target: string) {
     await using runner = await runUI(options, target);
     const vision = !!options.vision;
     const tailwind = options.env.useTailwind;
-    const library = await detectLibraryFromTargetPath(target) ?? options.env.libraryMode;
+    const library = await getTargetContext(target) ?? options.env.libraryMode;
 
     console.log("[previs:detect]", {
       tailwind,
@@ -285,24 +288,25 @@ export async function doctor(_options: PrevisOptions) {
     console.log("❌ PREVIS_OPENAI_API_KEY is not set. Please set it in .env or environment variable");
   }
 
-  const { viteDir, cwd, tsconfig, isReactJsx, libraryMode, packageJson, base, gitignore } = await analyzeEnv(Deno.cwd());
-  if (viteDir) {
-    console.log("✅ vite:", formatFilepath(cwd, viteDir.path));
+  // const { viteDir, cwd, tsconfig, isReactJsx, libraryMode, packageJson, base, gitignore } = await analyzeEnv(Deno.cwd());
+  const context = await getProjectContext(Deno.cwd());
+  if (context.vite) {
+    console.log("✅ vite:", formatFilepath(context.base, context.vite.path));
   } else {
     console.log("❌ vite:", "Project is not setup for vite");
   }
 
-  if (gitignore) {
-    const content = await Deno.readTextFile(gitignore.path);
-    if (content.includes(".previs*")) {
-      console.log("✅ .gitignore includes .previs*");
-    } else {
-      console.log("❌ .gitignore:", "Add .previs* to .gitignore");
-    }
-  }
+  // if (context) {
+  //   const content = await Deno.readTextFile(gitignore.path);
+  //   if (content.includes(".previs*")) {
+  //     console.log("✅ .gitignore includes .previs*");
+  //   } else {
+  //     console.log("❌ .gitignore:", "Add .previs* to .gitignore");
+  //   }
+  // }
 
-  if (packageJson) {
-    console.log("✅ package.json:", formatFilepath(cwd, packageJson.path));
+  if (context.packageJson) {
+    console.log("✅ package.json:", formatFilepath(context.base, context.packageJson.path));
   } else {
     console.log("❌ package.json", "Put package.json in the root of the project");
   }
@@ -317,21 +321,21 @@ export async function doctor(_options: PrevisOptions) {
   //   console.log("✅ vscode settings:", formatFilepath(vscodeDir.found), '');
   // }
 
-  if (tsconfig) {
-    console.log("✅ tsconfig.json:", formatFilepath(cwd, tsconfig.path));
+  if (context.tsconfig) {
+    console.log("✅ tsconfig.json:", formatFilepath(context.base, context.tsconfig.path));
   }
 
-  if (isReactJsx) {
-    console.log("✅ compilerOptions.jsx: react-jsx");
-  } else {
-    console.log("❌ compilerOptions.jsx is not react-jsx");
+  // if (isReactJsx) {
+  //   console.log("✅ compilerOptions.jsx: react-jsx");
+  // } else {
+  //   console.log("❌ compilerOptions.jsx is not react-jsx");
+  // }
+
+  if (context.libraryMode) {
+    console.log("Library:", context.libraryMode);
   }
 
-  if (libraryMode) {
-    console.log("Library:", libraryMode);
-  }
-
-  console.log("Base:", formatFilepath(cwd, base));
+  console.log("Base:", formatFilepath(Deno.cwd(), context.base));
   return;
 
 

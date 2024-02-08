@@ -12,7 +12,7 @@ export type NewOptions = {
 
 export interface FixOptions extends NewOptions {
   code: string;
-  failedReason?: string;
+  errorText?: string;
 }
 
 export type ViewContext = {
@@ -84,7 +84,7 @@ export async function getFixedCode(options: FixOptions): Promise<string> {
   const messages = coder.fix({
     code: options.code,
     request: options.request,
-    failedReason: options.failedReason,
+    errorText: options.errorText,
   });
   return await requestCode({
     model: options.model,

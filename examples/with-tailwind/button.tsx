@@ -1,5 +1,5 @@
 export default function Button() {
-  // Changed the button background color from yellow to blue
+  // Changed the button background color from red back to blue
   return (
     <button
       type="button"
@@ -10,7 +10,7 @@ export default function Button() {
   );
 }
 
-// The __PREVIEW__ function showcases the Button component with the newly updated blue background
+// The __PREVIEW__ function showcases the Button component with the updated blue background
 export function __PREVIEW__() {
   return <Button />;
 }

@@ -80,9 +80,9 @@ Please write a new code for ${opts.filename}.`,
       code: string,
       request: string,
       test?: string,
-      failedReason?: string
+      errorText?: string
     }): ChatMessage[] {
-      const content = buildFixRequest(opts.code, opts.request, opts.test, opts.failedReason);
+      const content = buildFixRequest(opts.code, opts.request, opts.test, opts.errorText);
       return [
         {
           role: 'system',
@@ -101,7 +101,7 @@ function buildFixRequest(
   code: string,
   request: string,
   test?: string,
-  failedReason?: string
+  errorText?: string
 ) {
   return `## Code
 
@@ -110,7 +110,7 @@ ${code}
 \`\`\`
 
 ${test ? `## Test\n\n${test}\n` : ''}
-${failedReason ? `## Failed Reason\n\n${failedReason}` : ''}
+${errorText ? `## Failed Reason\n\n${errorText}` : ''}
 
 ## Request
 

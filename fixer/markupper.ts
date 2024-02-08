@@ -58,11 +58,11 @@ export function buildMarkupper(options: MarkupperOptions) {
       code: string,
       request: string,
       test?: string,
-      failedReason?: string,
+      errorText?: string,
       imageUrl?: string,
     }): ChatMessage[] {
       const { code, test, request, imageUrl } = opts;
-      const fixingContent = buildFixRequest(code, request, test, opts.failedReason);
+      const fixingContent = buildFixRequest(code, request, test, opts.errorText);
       return [
         {
           role: 'system',
@@ -77,7 +77,7 @@ export function buildMarkupper(options: MarkupperOptions) {
     fixWithTest(opts: {
       code: string,
       request: string,
-      failedReason: string,
+      errorText: string,
       testCommand: string[],
       test?: string,
       lastPrompt?: string,
@@ -88,7 +88,7 @@ export function buildMarkupper(options: MarkupperOptions) {
         opts.request,
         opts.test,
         opts.testCommand,
-        opts.failedReason,
+        opts.errorText,
         opts.lastPrompt
       );
       return [{
@@ -133,7 +133,7 @@ function buildFixRequest(
   code: string,
   request: string,
   test?: string,
-  failedReason?: string
+  errorText?: string
 ) {
   let result = `## Code
 
@@ -147,10 +147,10 @@ ${test ? `## Test\n\n${test}\n` : ''}
 
 ${request}
 `;
-  if (failedReason) {
+  if (errorText) {
     result += `## Failed Reason
 
-${failedReason}
+${errorText}
 
 You should modify the code to pass the test.
 `;
