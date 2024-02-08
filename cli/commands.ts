@@ -244,6 +244,8 @@ async function runUI(options: CLIOptions) {
     if (await hasCmd("imgcat")) {
       const width = options.width ? pxToNumber(options.width) : 400;
       await $`imgcat -W ${width}px ${screenshotPath}`;
+    } else if (await hasCmd("code")) {
+      await $`code ${screenshotPath}`;
     }
   };
   const browser = await startBrowser({
@@ -286,22 +288,12 @@ export async function doctor(_options: CLIOptions) {
     console.log("❌ PREVIS_OPENAI_API_KEY is not set. Please set it in .env or environment variable");
   }
 
-  // const { viteDir, cwd, tsconfig, isReactJsx, libraryMode, packageJson, base, gitignore } = await analyzeEnv(Deno.cwd());
   const context = await getProjectContext(Deno.cwd());
   if (context.vite) {
     console.log("✅ vite:", formatFilepath(context.base, context.vite.path));
   } else {
     console.log("❌ vite:", "Project is not setup for vite");
   }
-
-  // if (context) {
-  //   const content = await Deno.readTextFile(gitignore.path);
-  //   if (content.includes(".previs*")) {
-  //     console.log("✅ .gitignore includes .previs*");
-  //   } else {
-  //     console.log("❌ .gitignore:", "Add .previs* to .gitignore");
-  //   }
-  // }
 
   if (context.packageJson) {
     console.log("✅ package.json:", formatFilepath(context.base, context.packageJson.path));
