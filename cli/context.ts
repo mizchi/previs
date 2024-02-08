@@ -13,6 +13,8 @@ export type ProjectContext = {
   tailwind?: Found;
   useTailwind: boolean;
   libraryMode: LibraryMode;
+  getInput: (message: string) => string | undefined,
+  getConfirm: (message: string) => boolean,
   // isReactJsx: boolean;
 }
 
@@ -36,6 +38,9 @@ export async function getProjectContext(cwd: string): Promise<ProjectContext> {
     // isReactJsx,
     packageJson,
     libraryMode,
+    // utils
+    getInput,
+    getConfirm,
   };
   async function detectLibraryMode(tsconfigPath: string) {
     const content = await Deno.readTextFile(tsconfigPath);
@@ -91,3 +96,21 @@ export async function getTargetContext(filepath: string): Promise<LibraryMode | 
   }
 }
 
+function getInput(message: string): string | undefined {
+  const handler = () => {
+    // ignore
+  };
+  Deno.addSignalListener('SIGINT', handler);
+  const ret = prompt(message);
+  Deno.removeSignalListener('SIGINT', handler);
+  if (ret === null) return undefined;
+  return ret;
+}
+
+function getConfirm(message: string): boolean {
+  const out = prompt(`${message} [y/n]`);
+  if (out === null || out.toLowerCase() === 'n') {
+    return false;
+  }
+  return out.toLowerCase() === 'y';
+}

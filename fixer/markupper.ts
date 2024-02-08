@@ -1,4 +1,3 @@
-import I from "https://esm.sh/v135/immediate@3.0.6/denonext/immediate.mjs";
 import { ChatContent, ChatMessage } from './types.ts';
 
 const SHARED_INTRO = 'You are CSS specialist. You write typescript-jsx(tsx) code.';
@@ -78,7 +77,7 @@ export function buildMarkupper(options: MarkupperOptions) {
       code: string,
       request: string,
       errorText: string,
-      testCommand: string[],
+      testCmd: string[],
       test?: string,
       lastPrompt?: string,
       imageUrl?: string,
@@ -87,9 +86,8 @@ export function buildMarkupper(options: MarkupperOptions) {
         opts.code,
         opts.request,
         opts.test,
-        opts.testCommand,
+        opts.testCmd,
         opts.errorText,
-        opts.lastPrompt
       );
       return [{
         role: 'system',
@@ -165,9 +163,8 @@ function buildRetryRequest(
   code: string,
   request: string,
   test: string | undefined,
-  testCommand: string[],
+  testCmd: string[],
   failReason: string,
-  oldPrompt?: string
 ) {
   return `## Code (Test Failed)
 
@@ -176,7 +173,6 @@ ${code}
 \`\`\`
 
 ${test ? `## Test\n\n${test}\n` : ''}
-${oldPrompt ? `## Old prompt\n\n${oldPrompt}` : ''}
 
 ## Request
 
@@ -184,7 +180,7 @@ ${request}
 
 ## Failed Reason
 
-test command: ${testCommand.join(" ")}
+test command: ${testCmd.join(" ")}
 
 ${failReason}
 

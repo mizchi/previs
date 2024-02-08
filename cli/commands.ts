@@ -2,30 +2,20 @@ import { readFile } from 'node:fs/promises';
 import { startBuilder } from "../builder/mod.ts";
 import { join, $ } from "../deps.ts";
 import { getFixedComponent, getFixedCode, getNewComponent, getNewCode, FixOptions } from "../fixer/mod.ts";
-import { PrevisOptions } from "./options.ts";
+import { CLIOptions, getHelpText } from "./options.ts";
 import { startBrowser } from "../screenshot/mod.ts";
-// import { analyzeEnv, detectLibraryFromTargetPath, formatFilepath, getTempFilepath, pxToNumber } from "../utils.ts";
 import { formatFilepath, getTempFilepath, pxToNumber } from "../utils.ts";
-import { getProjectContext, getTargetContext } from "./context.ts";
-
+import { ProjectContext, getProjectContext, getTargetContext } from "./context.ts";
 
 const defaultPort = "3434";
 
-export async function init(_options: PrevisOptions) {
+// deno-lint-ignore require-await
+export async function init(_options: CLIOptions, _ctx: ProjectContext) {
   throw new Error("Not implemented");
-  // const virtualRoot = join(Deno.cwd(), ".previs");
-  // await initializeProject({
-  //   width: options.width ?? "fit-content",
-  //   height: options.height ?? "fit-content",
-  //   preExists: false,
-  //   virtualRoot,
-  //   viteBase: Deno.cwd(),
-  //   style: options.style?.map(s => join(Deno.cwd(), s)) ?? []
-  // });
 }
 
-export async function screenshot(options: PrevisOptions, target: string) {
-  await using ui = await runUI(options, target);
+export async function screenshot(options: CLIOptions, _ctx: ProjectContext) {
+  await using ui = await runUI(options);
   await ui.screenshot();
   if (await hasCmd("imgcat")) {
     const width = options.width ? pxToNumber(options.width) : 400;
@@ -33,12 +23,13 @@ export async function screenshot(options: PrevisOptions, target: string) {
   }
 }
 
-export async function fix(options: PrevisOptions, target: string) {
+export async function fix(options: CLIOptions, ctx: ProjectContext) {
+  const target = options.target!;
   const uiMode = !target.endsWith(".ts");
   const vision = !!options.vision && uiMode;
   const tempTarget = getTempFilepath(target);
-  const tailwind = options.env.useTailwind;
-  const library = await getTargetContext(target) ?? options.env.libraryMode;
+  const tailwind = ctx.useTailwind;
+  const library = await getTargetContext(target) ?? ctx.libraryMode;
   const auto = options.auto;
 
   console.log("[previs:detect]", {
@@ -46,19 +37,19 @@ export async function fix(options: PrevisOptions, target: string) {
     library,
   });
 
-  if (auto && !options.testCommand) {
-    throw new Error("testCommand is required for auto mode");
+  if (auto && !options.testCmd) {
+    throw new Error("testCmd is required for auto mode");
   }
   await Deno.copyFile(target, tempTarget);
 
-  await using ui = uiMode ? await runUI(options, target) : null;
+  await using ui = uiMode ? await runUI(options) : null;
   await ui?.screenshot();
 
   let code = await Deno.readTextFile(tempTarget);
   let errorText: string | undefined = undefined;
 
-  if (options.testCommand) {
-    const result = await runTest({ testCommand: options.testCommand, target: tempTarget });
+  if (options.testCmd) {
+    const result = await runTest({ testCmd: options.testCmd, target: tempTarget });
     if (result.code === 0) {
       // test passed
     } else {
@@ -66,7 +57,7 @@ export async function fix(options: PrevisOptions, target: string) {
     }
   }
 
-  let request = options.request ?? auto ? "Pass tests" : await options.getInput("Request>");
+  let request = options.request ?? auto ? "Pass tests" : ctx.getInput("fix>");
   if (!request) {
     await Deno.remove(tempTarget);
     return;
@@ -91,8 +82,8 @@ export async function fix(options: PrevisOptions, target: string) {
         getImage: () => ui!.getBase64Image(),
       })
       : await getFixedCode(fixOptions);
-    if (options.testCommand) {
-      const [cmd, ...args] = options.testCommand;
+    if (options.testCmd) {
+      const [cmd, ...args] = options.testCmd;
       const newArgs = args.map(s => s.replace('__FILE__', tempTarget));
       const testResult = await $`${cmd} ${newArgs}`.noThrow();
       if (testResult.code === 0) {
@@ -117,7 +108,7 @@ export async function fix(options: PrevisOptions, target: string) {
       break;
     }
 
-    request = options.getInput("Accept? [y/N/<request>]");
+    request = ctx.getInput("Accept? [y/N/<request>]");
     if (request === "y") {
       await Deno.rename(tempTarget, target);
       break;
@@ -130,12 +121,12 @@ export async function fix(options: PrevisOptions, target: string) {
   }
 }
 
-export async function test(options: PrevisOptions, target: string) {
-  if (!options.testCommand) {
-    throw new Error("testCommand is not set");
+export async function test(options: CLIOptions, _ctx: ProjectContext) {
+  if (!options.testCmd) {
+    throw new Error("testCmd is not set");
   }
-  const [cmd, ...args] = options.testCommand;
-  const newArgs = args.map(s => s.replace('__FILE__', target));
+  const [cmd, ...args] = options.testCmd;
+  const newArgs = args.map(s => s.replace('__FILE__', options.target!));
 
   // console.log(`[previs] Testing ${target} with ${cmd} ${newArgs.join(' ')}`);
   const testResult = await $`${cmd} ${newArgs}`.noThrow();
@@ -147,15 +138,16 @@ export async function test(options: PrevisOptions, target: string) {
   }
 }
 
-export async function generate(options: PrevisOptions, target: string) {
+export async function generate(options: CLIOptions, ctx: ProjectContext) {
+  const target = options.target!;
   const uiMode = !target.endsWith(".ts");
 
   if (uiMode) {
     await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
-    await using runner = await runUI(options, target);
+    await using runner = await runUI(options);
     const vision = !!options.vision;
-    const tailwind = options.env.useTailwind;
-    const library = await getTargetContext(target) ?? options.env.libraryMode;
+    const tailwind = ctx.useTailwind;
+    const library = await getTargetContext(target) ?? ctx.libraryMode;
 
     console.log("[previs:detect]", {
       tailwind,
@@ -163,7 +155,7 @@ export async function generate(options: PrevisOptions, target: string) {
     });
 
     const tempTarget = getTempFilepath(target);
-    const request = options.request ?? options.getInput("What is this file?");
+    const request = options.request ?? ctx.getInput("What is this file?");
     if (!request) return;
     const newCode = await getNewComponent({
       target,
@@ -181,7 +173,7 @@ export async function generate(options: PrevisOptions, target: string) {
       await printCode(tempTarget);
     }
     await runner.screenshot();
-    const accepted = options.yes ?? options.getConfirm("Accept?");
+    const accepted = options.yes ?? ctx.getConfirm("Accept?");
     if (accepted) {
       await Deno.rename(tempTarget, target);
     } else {
@@ -193,7 +185,7 @@ export async function generate(options: PrevisOptions, target: string) {
 
     const tempTarget = getTempFilepath(target);
     // first time
-    const request = options.request ?? options.getInput("What is this file?");
+    const request = options.request ?? ctx.getInput("What is this file?");
     if (!request) return;
     const newCode = await getNewCode({
       model: options.model,
@@ -205,7 +197,7 @@ export async function generate(options: PrevisOptions, target: string) {
     if (!options.noPrint) {
       await printCode(tempTarget);
     }
-    const accepted = options.yes ?? options.getConfirm("Accept?");
+    const accepted = options.yes ?? ctx.getConfirm("Accept?");
     if (accepted) {
       await Deno.rename(tempTarget, target);
     } else {
@@ -214,20 +206,26 @@ export async function generate(options: PrevisOptions, target: string) {
   }
 }
 
-export async function serve(options: PrevisOptions, target: string) {
+export async function serve(options: CLIOptions, _ctx: ProjectContext) {
+  const target = options.target!;
   const imports = options.import?.map(s => join(Deno.cwd(), s)) ?? []
   const port = Number(options.port || defaultPort);
 
-  return await startBuilder({
-    cwd: Deno.cwd(),
+  await startBuilder({
+    cwd: _ctx.base,
     target,
     imports,
     port,
   });
 }
 
-async function runUI(options: PrevisOptions, target: string) {
-  const tempTarget = getTempFilepath(target);
+export async function help(_options: CLIOptions, _ctx: ProjectContext) {
+  const helpText = getHelpText();
+  console.log(helpText);
+}
+
+async function runUI(options: CLIOptions) {
+  const tempTarget = getTempFilepath(options.target!);
   const imports = options.import?.map(s => join(Deno.cwd(), s)) ?? []
 
   const builder = await startBuilder({
@@ -265,7 +263,7 @@ async function runUI(options: PrevisOptions, target: string) {
       await builder.ensureBuild();
       await browser.screenshot(screenshotUrl);
       if (!options.noPrint) {
-        await $`git --no-pager diff --no-index --color=always ${target} ${tempTarget}`.noThrow();
+        await $`git --no-pager diff --no-index --color=always ${options.target!} ${tempTarget}`.noThrow();
       }
     },
     async [Symbol.asyncDispose]() {
@@ -275,7 +273,7 @@ async function runUI(options: PrevisOptions, target: string) {
   }
 }
 
-export async function doctor(_options: PrevisOptions) {
+export async function doctor(_options: CLIOptions) {
   await checkInstalled('git', 'Please install git');
   await checkInstalled('code', 'Please install vscode cli. https://code.visualstudio.com/docs/editor/command-line');
   await checkInstalled('imgcat', 'Please install imgcat.\nDownload https://iterm2.com/utilities/imgcat and chmod +x in PATH');
@@ -356,8 +354,8 @@ export async function doctor(_options: PrevisOptions) {
 }
 
 
-async function runTest(options: { testCommand: string[], target: string }) {
-  const [cmd, ...args] = options.testCommand;
+async function runTest(options: { testCmd: string[], target: string }) {
+  const [cmd, ...args] = options.testCmd;
   const newArgs = args.map(s => s.replace('__FILE__', options.target));
   const testResult = await $`${cmd} ${newArgs}`.noThrow();
   return testResult;
@@ -374,13 +372,5 @@ async function printCode(target: string) {
   } else {
     await $`cat ${target}`;
   }
-}
-
-function getViewContext(options: PrevisOptions, target: string) {
-  return {
-    uiMode: !target.endsWith(".ts"),
-    tailwind: options.env.useTailwind,
-    library: options.env.libraryMode,
-  };
 }
 

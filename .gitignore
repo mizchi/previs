@@ -1,3 +1,4 @@
 node_modules
 .previs*
 .env
+vite-app

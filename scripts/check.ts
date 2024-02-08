@@ -1,5 +1,6 @@
 #!/usr/bin/env -S deno run -A --ext=ts
 import { $, join } from '../deps.ts';
+$.setPrintCommand(true);
 
 const cwd = Deno.cwd();
 

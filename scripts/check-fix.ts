@@ -1,4 +1,5 @@
 import { $ } from "../deps.ts";
+$.setPrintCommand(true);
 
 $.cd("examples/with-tailwind");
 

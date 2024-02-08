@@ -1,7 +1,7 @@
 import { exists, join, parseArgs } from "../deps.ts";
-import { getProjectContext, ProjectContext } from "./context.ts";
 
 const CMDS = [
+  "help",
   "doctor",
   "init",
   "test",
@@ -22,6 +22,7 @@ const argsOptions = {
   model: {
     type: "string",
     short: "m",
+    description: "OpenAI API model",
   },
   vision: {
     type: "boolean",
@@ -79,45 +80,35 @@ const HELP_INTRO = `usage:
 $ previs [options] <target-file>
 
 Examples:
-  $ previs doctor                  # check previs can work
-  $ previs button.tsx              # start fix existed file
+  $ previs button.tsx # start fix existed file
   $ previs button.tsx -i index.css # load with css
 `;
 
-export type PrevisOptions = ReturnType<typeof getParsedArgs>['values'] & {
-  env: ProjectContext;
-  testCommand?: string[];
-  getInput: (message: string) => string | undefined;
-  getConfirm: (message: string) => boolean;
-  target: string | undefined;
-  command: string;
-};
+// function getParsedArgs(args: string[]) {
+//   const splitIndex = args.indexOf("--");
+//   if (splitIndex === -1) {
+//     const parsed = parseArgs({
+//       args: args,
+//       options: argsOptions,
+//       allowPositionals: true,
+//     });
+//     return {
+//       ...parsed,
+//       testCommand: undefined,
+//     }
+//   } else {
+//     return {
+//       ...parseArgs({
+//         args: args.slice(0, splitIndex),
+//         options: argsOptions,
+//         allowPositionals: true,
+//       }),
+//       testCommand: args.slice(splitIndex + 1),
+//     };
+//   }
+// }
 
-function getParsedArgs(args: string[]) {
-  const splitIndex = args.indexOf("--");
-  if (splitIndex === -1) {
-    const parsed = parseArgs({
-      args: args,
-      options: argsOptions,
-      allowPositionals: true,
-    });
-    return {
-      ...parsed,
-      testCommand: undefined,
-    }
-  } else {
-    return {
-      ...parseArgs({
-        args: args.slice(0, splitIndex),
-        options: argsOptions,
-        allowPositionals: true,
-      }),
-      testCommand: args.slice(splitIndex + 1),
-    };
-  }
-}
-
-export function help() {
+export function getHelpText() {
   let help = HELP_INTRO + '\n';
   help += "<options>\n";
   const keys = Object.keys(argsOptions);
@@ -129,40 +120,32 @@ export function help() {
     const defaultValue = option.default;
     help += `  ${short ? `-${short}, ` : ''}--${key} <${type}>${defaultValue ? ` (default: ${defaultValue})` : ""}\n`;
   }
-  console.log(help);
+  return help;
 }
 
-function getInput(message: string): string | undefined {
-  const handler = () => {
-    // ignore
-  };
-  Deno.addSignalListener('SIGINT', handler);
-  const ret = prompt(message);
-  Deno.removeSignalListener('SIGINT', handler);
-  if (ret === null) return undefined;
-  return ret;
-}
+export type CLIOptions = Awaited<ReturnType<typeof buildOptions>>;
 
-function getConfirm(message: string): boolean {
-  const out = prompt(`${message} [y/n]`);
-  if (out === null || out.toLowerCase() === 'n') {
-    return false;
-  }
-  return out.toLowerCase() === 'y';
-}
+export async function buildOptions(cwd: string, args: string[]) {
+  const splitIndex = args.indexOf("--");
+  const previsArgs = args.slice(0, splitIndex === -1 ? args.length : splitIndex);
+  const testCmd = splitIndex === -1 ? undefined : args.slice(splitIndex + 1);
 
-export async function buildOptions(cwd: string, args: string[]): Promise<PrevisOptions> {
-  const options = getParsedArgs(args);
-  const env = await getProjectContext(cwd);
+  const parsed = parseArgs({
+    args: previsArgs,
+    options: argsOptions,
+    allowPositionals: true,
+  });
+  const first = parsed.positionals[0];
 
-  const first = options.positionals[0];
-
+  // define command
   let command: string;
   let target: string | undefined = undefined;
-  if (CMDS.includes(first)) {
+  if (first == null || parsed.values.help) {
+    command = "help";
+  } else if (CMDS.includes(first)) {
     command = first;
-    if (options.positionals[1]) {
-      target = join(cwd, options.positionals[1]);
+    if (parsed.positionals[1]) {
+      target = join(cwd, parsed.positionals[1]);
     }
   } else {
     target = join(cwd, first);
@@ -173,15 +156,10 @@ export async function buildOptions(cwd: string, args: string[]): Promise<PrevisO
     }
   }
 
-  const previsOptions: PrevisOptions = {
-    ...options.values,
-    testCommand: options.testCommand,
-    env,
-    getInput,
-    getConfirm,
+  return {
+    ...parsed.values,
+    testCmd: testCmd,
     target: target,
     command,
   };
-
-  return previsOptions;
 }

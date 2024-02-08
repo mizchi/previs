@@ -1,6 +1,6 @@
 {
   "scale": "auto",
   "import": ["./src/pre.js"],
-  "testCommand": ["pnpm", "vitest", "run", "__FILE__"],
+  "testCmd": ["pnpm", "vitest", "run", "__FILE__"],
   "vision": true
 }
