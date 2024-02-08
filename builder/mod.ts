@@ -43,7 +43,7 @@ export async function startBuilder(options: BuilderOption) {
         }
       }
     },
-    end() {
+    async dispose() {
       server.close();
     }
   };

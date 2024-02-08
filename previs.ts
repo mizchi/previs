@@ -4,42 +4,10 @@ import { help, getParsedArgs, PrevisOptions } from "./options.ts"
 import { analyzeEnv } from "./utils.ts";
 
 const options = getParsedArgs(Deno.args);
-// ==== process helper ====
-const __disposes: Array<() => void | Promise<void>> = [];
-function addHook(disposeFn: () => void | Promise<void>) {
-  if (__disposes.length === 0) {
-    // hook once
-    Deno.addSignalListener("SIGINT", async () => {
-      for (const disposeFn of __disposes) {
-        try {
-          await disposeFn();
-        } catch (err) {
-          console.error('[previs:hooks:error]', err);
-        }
-      }
-      __disposes.length = 0;
-      Deno.exit(1);
-    });
-  }
-  __disposes.push(disposeFn);
-}
 
-async function exit(status: number) {
-  if (__disposes.length === 0) Deno.exit(status);
-  for (const disposeFn of __disposes) {
-    try {
-      await disposeFn();
-    } catch (err) {
-      console.error('[previs:hooks:error]', err);
-    }
-  }
-  __disposes.length = 0;
-  Deno.exit(status);
-}
-
-// const __queue = options.values.queue ? options.values.queue.split(",").map(s => s.trim()) : undefined;
 function getInput(message: string): string | undefined {
   const handler = () => {
+    // ignore
   };
   Deno.addSignalListener('SIGINT', handler);
   const ret = prompt(message);
@@ -63,11 +31,11 @@ async function cleanTempFiles(dir: string) {
       console.log("[previs:clean]", entry.name + '/*');
       await Deno.remove(join(dir, entry.name), { recursive: true, });
     }
-    // remove or rollback .bk files
+    // remove or rollback
     if (entry.isFile && entry.name.includes(".__previs__.")) {
       const backupPath = join(dir, entry.name);
       const originalPath = backupPath.replace('.__previs__.', ".");
-      const doRollback = await getConfirm(`[previs] Dirty file exists. Do you want to rollback ${originalPath}?`);
+      const doRollback = getConfirm(`[previs] rollback? ${originalPath}?`);
       if (doRollback) {
         const backupContent = await Deno.readTextFile(backupPath);
         await Deno.writeTextFile(originalPath, backupContent);
@@ -79,7 +47,6 @@ async function cleanTempFiles(dir: string) {
         console.log("[previs:clean]", backupPath);
       }
     }
-
   }
 }
 
@@ -101,73 +68,75 @@ const commandNamesWithTarget = [
   "generate",
   "serve",
 ];
+
+let isError = false;
+
 try {
-  // pre cleanup
   await cleanTempFiles(Deno.cwd());
-  // post cleanup
-  addHook(() => cleanTempFiles(Deno.cwd()));
+  // Deno.addSignalListener("SIGINT", onSignal);
 
   const env = await analyzeEnv(Deno.cwd());
   const first = options.positionals[0];
 
-  const newOptions: PrevisOptions = {
+  const previsOptions: PrevisOptions = {
     ...options.values,
     testCommand: options.testCommand,
     env,
-    addHook,
-    exit,
     getInput,
     getConfirm,
   };
   if (first === 'doctor') {
-    await doctor(newOptions);
-    await exit(0);
+    await doctor(previsOptions);
+    // Deno.exit(0);
   } else if (first === 'init') {
-    await init(newOptions);
-    await exit(0);
-  }
-  if (commandNamesWithTarget.includes(first)) {
+    await init(previsOptions);
+    // Deno.exit(0);
+  } else if (commandNamesWithTarget.includes(first)) {
     const second = options.positionals[1];
     if (!second) throw new Error("Please specify target file");
     const target = join(Deno.cwd(), second);
+    // tempTarget = getTempFilepath(target);
     switch (first) {
       case "t":
       case "test":
-        await test(newOptions, target);
+        await test(previsOptions, target);
         break;
       case "screenshot":
       case "ss":
-        await screenshot(newOptions, target);
+        await screenshot(previsOptions, target);
         break;
       case "fix":
-        await fix(newOptions, target);
+        await fix(previsOptions, target);
         break;
       case "g":
       case "gen":
       case "generate":
-        await generate(newOptions, target);
+        await generate(previsOptions, target);
         break;
       case "serve":
-        await serve(newOptions, target);
+        await serve(previsOptions, target);
         break;
     }
   } else {
     // no command
     const target = join(Deno.cwd(), first);
+    // tempTarget = getTempFilepath(target);
     if (await exists(target)) {
       // run fix if exists
       console.log("[previs:fix]");
-      await fix(newOptions, target);
+      await fix(previsOptions, target);
     } else {
       // run create if file not exists
       console.log("[previs:gen]");
-      await generate(newOptions, target);
+      await generate(previsOptions, target);
     }
   }
 } catch (err) {
   console.error(err);
-  await exit(1);
+  isError = true;
 } finally {
-  await exit(0);
+  await cleanTempFiles(Deno.cwd());
+  // Deno.removeSignalListener("SIGINT", onSignal);
+  Deno.exit(isError ? 1 : 0);
 }
 

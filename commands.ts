@@ -22,13 +22,12 @@ export async function init(_options: PrevisOptions) {
 }
 
 export async function screenshot(options: PrevisOptions, target: string) {
-  const ssbr = await runUI(options, target);
-  await ssbr.screenshot();
+  await using ui = await runUI(options, target);
+  await ui.screenshot();
   if (await hasCmd("imgcat")) {
     const width = options.width ? pxToNumber(options.width) : 400;
-    await $`imgcat -W ${width}px ${ssbr.getScreenshotPath()}`;
+    await $`imgcat -W ${width}px ${ui.getScreenshotPath()}`;
   }
-  await ssbr.end();
 }
 
 export async function fix(options: PrevisOptions, target: string) {
@@ -49,12 +48,8 @@ export async function fix(options: PrevisOptions, target: string) {
   }
   await Deno.copyFile(target, tempTarget);
 
-  let runner: Awaited<ReturnType<typeof runUI>> | undefined = undefined;
-
-  if (uiMode) {
-    runner = await runUI(options, target);
-    await runner.screenshot();
-  }
+  await using ui = uiMode ? await runUI(options, target) : null;
+  await ui?.screenshot();
 
   let code = await Deno.readTextFile(tempTarget);
   let failedReason: string | undefined = undefined;
@@ -70,7 +65,6 @@ export async function fix(options: PrevisOptions, target: string) {
 
   let request = options.request ?? auto ? "Pass tests" : await options.getInput("Request>");
   if (!request) {
-    await runner?.end();
     await Deno.remove(tempTarget);
     return;
   };
@@ -91,7 +85,7 @@ export async function fix(options: PrevisOptions, target: string) {
         vision,
         library,
         tailwind,
-        getImage: () => runner!.getBasey64Image(),
+        getImage: () => ui!.getBase64Image(),
       })
       : await getFixedCode(fixOptions);
     if (options.testCommand) {
@@ -112,7 +106,7 @@ export async function fix(options: PrevisOptions, target: string) {
     }
     // save and screenshot
     await Deno.writeTextFile(tempTarget, newCode);
-    await runner?.screenshot();
+    await ui?.screenshot();
 
     // pass 
     if (auto) {
@@ -120,7 +114,7 @@ export async function fix(options: PrevisOptions, target: string) {
       break;
     }
 
-    request = await options.getInput("Accept? [y/N/<request>]");
+    request = options.getInput("Accept? [y/N/<request>]");
     if (request === "y") {
       await Deno.rename(tempTarget, target);
       break;
@@ -131,11 +125,9 @@ export async function fix(options: PrevisOptions, target: string) {
     }
     code = newCode;
   }
-  await runner?.end();
 }
 
 export async function test(options: PrevisOptions, target: string) {
-  // const tempTarget = getTempFilepath(target);
   if (!options.testCommand) {
     throw new Error("testCommand is not set");
   }
@@ -157,7 +149,7 @@ export async function generate(options: PrevisOptions, target: string) {
 
   if (uiMode) {
     await Deno.writeTextFile(target, 'export default function () {\n  return <div>Hello</div>\n}');
-    const runner = await runUI(options, target);
+    await using runner = await runUI(options, target);
     const vision = !!options.vision;
     const tailwind = options.env.useTailwind;
     const library = await detectLibraryFromTargetPath(target) ?? options.env.libraryMode;
@@ -178,7 +170,7 @@ export async function generate(options: PrevisOptions, target: string) {
       debug: options.debug,
       model: options.model,
       vision,
-      getImage: () => runner.getBasey64Image(),
+      getImage: () => runner.getBase64Image(),
     });
 
     await Deno.writeTextFile(tempTarget, newCode);
@@ -186,20 +178,19 @@ export async function generate(options: PrevisOptions, target: string) {
       await printCode(tempTarget);
     }
     await runner.screenshot();
-    const accepted = options.yes ?? await options.getConfirm("Accept?");
+    const accepted = options.yes ?? options.getConfirm("Accept?");
     if (accepted) {
       await Deno.rename(tempTarget, target);
     } else {
       await Deno.remove(tempTarget);
     }
-    await runner.end();
   } else {
     // non-ui mode
     await Deno.writeTextFile(target, 'export default function () {}');
 
     const tempTarget = getTempFilepath(target);
     // first time
-    const request = options.request ?? await options.getInput("What is this file?");
+    const request = options.request ?? options.getInput("What is this file?");
     if (!request) return;
     const newCode = await getNewCode({
       model: options.model,
@@ -211,7 +202,7 @@ export async function generate(options: PrevisOptions, target: string) {
     if (!options.noPrint) {
       await printCode(tempTarget);
     }
-    const accepted = options.yes ?? await options.getConfirm("Accept?");
+    const accepted = options.yes ?? options.getConfirm("Accept?");
     if (accepted) {
       await Deno.rename(tempTarget, target);
     } else {
@@ -221,13 +212,9 @@ export async function generate(options: PrevisOptions, target: string) {
 }
 
 export async function serve(options: PrevisOptions, target: string) {
-  const builder = await runBuilder(options, target);
-  options.addHook(() => builder.end());
-}
-
-async function runBuilder(options: PrevisOptions, target: string) {
   const imports = options.import?.map(s => join(Deno.cwd(), s)) ?? []
   const port = Number(options.port || defaultPort);
+
   return await startBuilder({
     cwd: Deno.cwd(),
     target,
@@ -238,8 +225,14 @@ async function runBuilder(options: PrevisOptions, target: string) {
 
 async function runUI(options: PrevisOptions, target: string) {
   const tempTarget = getTempFilepath(target);
-  const builder = await runBuilder(options, tempTarget);
-  options.addHook(() => builder.end());
+  const imports = options.import?.map(s => join(Deno.cwd(), s)) ?? []
+
+  const builder = await startBuilder({
+    cwd: Deno.cwd(),
+    target: tempTarget,
+    imports,
+    port: Number(options.port || defaultPort),
+  });
   const scale = options.scale ?? typeof options.scale === "string" ? Number(options.scale) : undefined;
   const tmpdir = Deno.makeTempDirSync();
   const screenshotPath = join(tmpdir, "ss.png");
@@ -260,15 +253,10 @@ async function runUI(options: PrevisOptions, target: string) {
     scale,
     debug: options.debug
   });
-  options.addHook(async () => await browser.close());
   return {
     getScreenshotPath: () => screenshotPath,
-    async getBasey64Image() {
+    async getBase64Image() {
       return await readFile(screenshotPath, 'base64');
-    },
-    async end() {
-      builder.end();
-      await browser.close();
     },
     screenshot: async () => {
       await builder.ensureBuild();
@@ -276,7 +264,11 @@ async function runUI(options: PrevisOptions, target: string) {
       if (!options.noPrint) {
         await $`git --no-pager diff --no-index --color=always ${target} ${tempTarget}`.noThrow();
       }
-    }
+    },
+    async [Symbol.asyncDispose]() {
+      builder.dispose();
+      await browser.dispose();
+    },
   }
 }
 

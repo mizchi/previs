@@ -49,7 +49,6 @@ export async function startBrowser(options: {
   });
   const page = await browser.newPage();
   let initialized = false;
-  let closed = false;
   return {
     async _getRootSize() {
       const el = await page.$("#root");
@@ -112,13 +111,9 @@ export async function startBrowser(options: {
       }
       await options.onScreenshot?.(url);
     },
-    close: async () => {
-      if (closed) {
-        return;
-      }
-      closed = true;
+    async dispose() {
       await browser.close();
-    },
+    }
   }
 }
 

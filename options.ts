@@ -74,8 +74,6 @@ Examples:
 export type PrevisOptions = ReturnType<typeof getParsedArgs>['values'] & {
   env: AnalyzedEnv;
   testCommand?: string[];
-  addHook: (fn: () => void) => void;
-  exit: (code: number) => void;
   getInput: (message: string) => string | undefined;
   getConfirm: (message: string) => boolean;
 };
