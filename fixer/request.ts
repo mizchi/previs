@@ -37,7 +37,16 @@ export async function requestCode(options: RequestCodeOptions) {
     spinner.setSpinnerType('dots8');
   }
   let raw = '';
-  for await (const input of streamOpenAI({ ...options, model, apiKey })) {
+
+  const controller = new AbortController();
+  const handler = () => {
+    console.log('SIGINT received, stopping...');
+    spinner?.stop();
+    Deno.removeSignalListener('SIGINT', handler);
+    controller.abort();
+  }
+  Deno.addSignalListener('SIGINT', handler);
+  for await (const input of streamOpenAI({ ...options, model, apiKey, signal: controller.signal })) {
     raw += input;
     if (options.debug) {
       await Deno.stdout.write(new TextEncoder().encode(input));
@@ -48,6 +57,7 @@ export async function requestCode(options: RequestCodeOptions) {
     await Deno.stdout.write(new TextEncoder().encode('\n'));
   }
   await spinner?.stop();
+  Deno.removeSignalListener('SIGINT', handler);
   // TODO: validate
   return extractCodeBlock(raw);
 }

@@ -34,18 +34,7 @@ async function cleanTempFiles(dir: string) {
     // remove or rollback
     if (entry.isFile && entry.name.includes(".__previs__.")) {
       const backupPath = join(dir, entry.name);
-      const originalPath = backupPath.replace('.__previs__.', ".");
-      const doRollback = getConfirm(`[previs] rollback? ${originalPath}?`);
-      if (doRollback) {
-        const backupContent = await Deno.readTextFile(backupPath);
-        await Deno.writeTextFile(originalPath, backupContent);
-        await Deno.remove(backupPath);
-        console.log("[previs:rollback]", originalPath);
-        console.log("[previs:clean]", backupPath);
-      } else {
-        await Deno.remove(backupPath);
-        console.log("[previs:clean]", backupPath);
-      }
+      console.log("[previs:clean]", backupPath);
     }
   }
 }

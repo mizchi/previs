@@ -238,3 +238,18 @@ export function pick<Data extends object, Keys extends keyof Data>(
 
   return result;
 }
+
+export function formatFilepath(cwd: string, path: string) {
+  if (path === cwd) {
+    return './';
+  }
+  if (path.startsWith(cwd)) {
+    const out = path.replace(cwd + '/', './');
+    return out;
+  } else {
+    if (path.startsWith(Deno.env.get("HOME")!)) {
+      return path.replace(Deno.env.get("HOME")!, '~');
+    }
+    return path;
+  }
+}

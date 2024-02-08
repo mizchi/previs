@@ -4,7 +4,7 @@ import { join, $ } from "./deps.ts";
 import { getFixedComponent, getFixedCode, getNewComponent, getNewCode, FixOptions } from "./fixer/mod.ts";
 import { PrevisOptions } from "./options.ts";
 import { startBrowser } from "./screenshot/mod.ts";
-import { analyzeEnv, detectLibraryFromTargetPath, getTempFilepath, pxToNumber } from "./utils.ts";
+import { analyzeEnv, detectLibraryFromTargetPath, formatFilepath, getTempFilepath, pxToNumber } from "./utils.ts";
 
 const defaultPort = "3434";
 
@@ -160,7 +160,7 @@ export async function generate(options: PrevisOptions, target: string) {
     });
 
     const tempTarget = getTempFilepath(target);
-    const request = options.request ?? await options.getInput("What is this file?");
+    const request = options.request ?? options.getInput("What is this file?");
     if (!request) return;
     const newCode = await getNewComponent({
       target,
@@ -287,7 +287,7 @@ export async function doctor(_options: PrevisOptions) {
 
   const { viteDir, cwd, tsconfig, isReactJsx, libraryMode, packageJson, base, gitignore } = await analyzeEnv(Deno.cwd());
   if (viteDir) {
-    console.log("✅ vite:", formatFilepath(viteDir.path));
+    console.log("✅ vite:", formatFilepath(cwd, viteDir.path));
   } else {
     console.log("❌ vite:", "Project is not setup for vite");
   }
@@ -302,7 +302,7 @@ export async function doctor(_options: PrevisOptions) {
   }
 
   if (packageJson) {
-    console.log("✅ package.json:", formatFilepath(packageJson.path));
+    console.log("✅ package.json:", formatFilepath(cwd, packageJson.path));
   } else {
     console.log("❌ package.json", "Put package.json in the root of the project");
   }
@@ -318,7 +318,7 @@ export async function doctor(_options: PrevisOptions) {
   // }
 
   if (tsconfig) {
-    console.log("✅ tsconfig.json:", formatFilepath(tsconfig.path));
+    console.log("✅ tsconfig.json:", formatFilepath(cwd, tsconfig.path));
   }
 
   if (isReactJsx) {
@@ -331,23 +331,9 @@ export async function doctor(_options: PrevisOptions) {
     console.log("Library:", libraryMode);
   }
 
-  console.log("Base:", formatFilepath(base));
+  console.log("Base:", formatFilepath(cwd, base));
   return;
 
-  function formatFilepath(path: string) {
-    if (path === cwd) {
-      return './';
-    }
-    if (path.startsWith(cwd)) {
-      const out = path.replace(cwd + '/', './');
-      return out;
-    } else {
-      if (path.startsWith(Deno.env.get("HOME")!)) {
-        return path.replace(Deno.env.get("HOME")!, '~');
-      }
-      return path;
-    }
-  }
 
   async function checkInstalled(command: string, failMessage: string) {
     if (await hasCmd(command)) {
