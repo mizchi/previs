@@ -11,6 +11,7 @@ type RequestCodeOptions = {
   apiKey?: string,
   debug?: boolean,
   expectedSize?: number,
+  printPrompt?: boolean,
 }
 
 const GPT_4_VISION_MODEL = 'gpt-4-vision-preview';
@@ -30,6 +31,10 @@ export function inferModel(options: {
 export async function requestCode(options: RequestCodeOptions) {
   const apiKey = options.apiKey ?? getApiKey();
   const model = options.model ?? inferModel({ messages: options.messages, vision: options.vision });
+  if (options.printPrompt) {
+    console.log("model:", model);
+    printPrompt(options.messages);
+  }
   let spinner: ReturnType<typeof Spinner.getInstance> | null = null;
   if (!options.debug) {
     spinner = Spinner.getInstance();
@@ -71,5 +76,22 @@ function getApiKey() {
 function extractCodeBlock(str: string): string {
   const result = str.match(/```tsx\n([\s\S]+?)\n```/)?.[1] ?? '';
   return prettier.format(result, { parser: "typescript" });
+}
+
+function printPrompt(messages: ChatMessage[]) {
+  for (const message of messages) {
+    console.log(`------- role:${message.role} -------`);
+    if (Array.isArray(message.content)) {
+      for (const c of message.content) {
+        if (c.type === 'image') {
+          console.log("<base64image>");
+        } else {
+          console.log('%c' + c.text, 'color: gray');
+        }
+      }
+    } else {
+      console.log('%c' + message.content, 'color: gray');
+    }
+  }
 }
 

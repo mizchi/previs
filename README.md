@@ -132,12 +132,8 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
 
 - Commands
   - [x] previs
-  - [x] previs gen
   - [x] previs fix
-  - [x] previs fix --auto
   - [x] previs doctor
-  - [x] previs ss
-  - [x] previs test
   - [ ] previs init
 - Integration
   - [x] react
@@ -152,6 +148,7 @@ $ previs button.tsx -- pnpm vitest --run __FILE__
   - [x] tailwind auto detection
   - [x] file named component detection
   - [ ] panda-css
+  - [ ] ChakraUI
 - [x] load tailwind config
 - [x] format
 - [ ] Load custom vite.config

@@ -1,20 +1,23 @@
 import { startBuilder } from "../builder/mod.ts";
-import { join, $, exists } from "../deps.ts";
+import { join, $, exists, basename } from "../deps.ts";
 import { getFixedComponent, getFixedCode, getNewComponent, getNewCode, FixOptions } from "../fixer/mod.ts";
 import { CLIOptions, getHelpText } from "./options.ts";
-import { formatFilepath, getTempFilepath, pxToNumber } from "../utils.ts";
+import { formatFilepath, getTempFilepath, isPreviewableCode, pxToNumber } from "../utils.ts";
 import { ProjectContext, getProjectContext, getTargetContext } from "./context.ts";
 import { startPresenter } from "./presenter.ts";
+import { multiSelect, nodePackageInstalled } from "./cli_utils.ts";
+import { ComponentFlag } from "../fixer/types.ts";
 
 const defaultPort = "3434";
+const DEFAULT_MAX_TEST_RETRIES = 3;
 
 // deno-lint-ignore require-await
 export async function init(_options: CLIOptions, _ctx: ProjectContext) {
   throw new Error("Not implemented");
 }
 
-export async function screenshot(options: CLIOptions, _ctx: ProjectContext) {
-  await using presenter = await startPresenter(options.target!, options);
+export async function screenshot(options: CLIOptions, ctx: ProjectContext) {
+  await using presenter = await startPresenter(options.target!, options, ctx);
   await presenter.screenshot();
   if (await hasCmd("imgcat")) {
     const width = options.width ? pxToNumber(options.width) : 400;
@@ -37,16 +40,18 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
   }
   let currentCode = "";
   let currentRequest: string | undefined = options.request;
-  let errorText: string | undefined = undefined;
+  // let errorText: string | undefined = undefined;
+  let testRetryCount = 0;
   const preExists = await exists(originalTarget);
 
   // fix mode
   if (preExists) {
     currentCode = await Deno.readTextFile(originalTarget);
   } else {
-    console.log('previs: entering generation mode');
+    console.log('%cprevis start new file generation', 'color: #0f0');
     // generation mode
-    const newRequest = currentRequest ?? ctx.getInput("new>");
+    const filename = basename(originalTarget);
+    const newRequest = currentRequest ?? ctx.getInput("new>", `Create ${filename}`);
     if (!newRequest) {
       return;
     }
@@ -55,6 +60,12 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
       currentRequest = undefined;
     }
     if (uiMode) {
+      const newComponentFlags = await multiSelect('includes...', [
+        { text: "In-Source Testing (Vitest)", selected: !!options.testCmd, value: 'in-source-test' },
+        { text: "Include __Preview__", selected: true, value: 'preview-component' },
+        { text: 'Use tailwind', selected: tailwind, value: 'tailwind' },
+        { text: "export default", selected: false, value: 'export-default' },
+      ]) as ComponentFlag[];
       currentCode = await getNewComponent({
         target: originalTarget,
         request: newRequest!,
@@ -62,20 +73,18 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
         library: library,
         debug: options.debug,
         model: options.model,
+        printPrompt: !!options.printPrompt,
         vision,
         getImage: () => ui?.getBase64Image()!,
-      });
+      }, newComponentFlags);
     } else {
       currentCode = await getNewCode({
         model: options.model,
         target: originalTarget,
         request: newRequest!,
         debug: !!options.debug,
+        printPrompt: !!options.printPrompt,
       });
-      if (options.testCmd) {
-        const result = await runTest(originalTarget, { testCmd: options.testCmd });
-        errorText = result.code === 0 ? undefined : result.stderr;
-      }
     }
   }
 
@@ -90,15 +99,30 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
 
     // run test
     if (options.testCmd) {
+      console.log('%cprevis running test', 'color: #0f0');
       const result = await runTest(tempTarget, { testCmd: options.testCmd });
-      errorText = result.code === 0 ? undefined : result.stderr;
+      // console.log('error', {
+      //   code: result.code,
+      //   stderr: result.stderr,
+      //   stdout: result.stdout,
+      // })
+      const errorText = result.code === 0 ? undefined : result.stderr;
+      if (errorText) {
+        testRetryCount++;
+      } else {
+        testRetryCount = 0;
+      }
+      currentRequest = "Fix test errors.\n\n" + errorText;
     }
   }
 
   // start presenter
-  await using ui = uiMode ? await startPresenter(tempTarget, options) : null;
+  await using ui = uiMode ? await startPresenter(tempTarget, options, ctx) : null;
   await Deno.writeTextFile(tempTarget, currentCode);
-  await ui?.screenshot();
+
+  if (isPreviewableCode(currentCode, originalTarget)) {
+    await ui?.screenshot();
+  }
   if (!uiMode) {
     await printCode(tempTarget);
   }
@@ -106,7 +130,7 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
   let request;
   // inintial request for existing file
   if (preExists) {
-    request = currentRequest ?? auto ? "Pass tests" : ctx.getInput("fix>");
+    request = currentRequest ?? ctx.getInput("fix>");
     if (!request) {
       await Deno.remove(tempTarget);
       return;
@@ -134,7 +158,7 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
       model: options.model,
       request: request!,
       debug: !!options.debug,
-      errorText,
+      printPrompt: !!options.printPrompt,
     };
     currentCode = uiMode
       ? await getFixedComponent({
@@ -143,7 +167,7 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
         library,
         tailwind,
         getImage: () => ui!.getBase64Image(),
-      })
+      }, ['preview-component'])
       : await getFixedCode(fixOptions);
     // save and screenshot
     await Deno.writeTextFile(tempTarget, currentCode);
@@ -151,14 +175,24 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
     // run test for temp file
     if (options.testCmd) {
       const testResult = await runTest(tempTarget, { testCmd: options.testCmd });
-      errorText = testResult.code === 0 ? undefined : testResult.stderr;
+      const errorText = testResult.code === 0 ? undefined : testResult.stderr;
       if (errorText) {
+        currentRequest = "Fix test errors.\n\n" + errorText;
+        testRetryCount++;
+        if (testRetryCount >= DEFAULT_MAX_TEST_RETRIES) {
+          console.log("Test failed too many times. Exiting.");
+          break;
+        }
         continue;
+      } else {
+        testRetryCount = 0;
       }
     }
 
     // display screenshot
-    await ui?.screenshot();
+    if (isPreviewableCode(currentCode, originalTarget)) {
+      await ui?.screenshot();
+    }
     if (!options.noPrint && await hasCmd("git")) {
       await $`git --no-pager diff --no-index --color=always ${originalTarget} ${tempTarget}`.noThrow();
     }
@@ -225,6 +259,9 @@ export async function doctor(_options: CLIOptions) {
   await checkInstalled('imgcat', 'Please install imgcat.\nDownload https://iterm2.com/utilities/imgcat and chmod +x in PATH');
   await checkInstalled('bat', 'Please install bat. https://github.com/sharkdp/bat');
 
+  await checkNodePackageInstalled("vite");
+  await checkNodePackageInstalled("vitest");
+
   const apiKey = Deno.env.get("OPENAI_API_KEY") ?? Deno.env.get("PREVIS_OPENAI_API_KEY")
   if (apiKey) {
     console.log("✅ PREVIS_OPENAI_API_KEY is set");
@@ -267,6 +304,22 @@ export async function doctor(_options: CLIOptions) {
 
   if (context.libraryMode) {
     console.log("Library:", context.libraryMode);
+    if (context.libraryMode === "react") {
+      await checkNodePackageInstalled("react");
+      await checkNodePackageInstalled("react-dom");
+    }
+
+    if (context.libraryMode === "vue") {
+      await checkNodePackageInstalled("vue");
+    }
+
+    if (context.libraryMode === "svelte") {
+      await checkNodePackageInstalled("svelte");
+    }
+
+    if (context.libraryMode === "preact") {
+      await checkNodePackageInstalled("preact");
+    }
   }
 
   console.log("Base:", formatFilepath(Deno.cwd(), context.base));
@@ -282,6 +335,18 @@ export async function doctor(_options: CLIOptions) {
       return false;
     }
   }
+
+  async function checkNodePackageInstalled(pkg: string) {
+    const failMessage = `Please install ${pkg}: npm install ${pkg} --save-dev`;
+    if (await nodePackageInstalled(pkg)) {
+      console.log(`✅ node: ${pkg}`);
+      return true;
+    } else {
+      console.log(`❌ node: ${pkg}:`, failMessage);
+      return false;
+    }
+  }
+
   // TODO: Check puppeteer
   // TODO: Check deno version
   // TODO: Check vite environment
@@ -289,11 +354,10 @@ export async function doctor(_options: CLIOptions) {
   // TODO: Check tailwindcss
 }
 
-
 async function runTest(target: string, options: { testCmd: string[] }) {
   const [cmd, ...args] = options.testCmd;
   const newArgs = args.map(s => s.replace('__FILE__', target));
-  const testResult = await $`${cmd} ${newArgs}`.noThrow();
+  const testResult = await $`${cmd} ${newArgs}`.noThrow().stderr("inheritPiped").stdout("inheritPiped");
   return testResult;
 }
 

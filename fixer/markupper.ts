@@ -1,33 +1,30 @@
-import { ChatContent, ChatMessage } from './types.ts';
+import { dedent, getExportSymbolForFilepath } from "../utils.ts";
+import { ChatContent, ChatMessage, ComponentFlag } from './types.ts';
 
-const SHARED_INTRO = 'You are CSS specialist. You write typescript-jsx(tsx) code.';
+const SHARED_INTRO = dedent(`
+You are CSS specialist. 
+You write typescript-jsx(tsx) code.
+You are requested to write a code for a component.
+`);
 
 const RULES = [
   'You should pass the test code given by the user',
   'No comments or explanations other than the code you are outputting are required. Instead, please leave a comment in the code whenever possible to indicate what the intent of the code was output.',
   'Please describe any changes you have made in the comments so that the intent is easy to read',
   'Write your comments in the same language as the instructions given',
-  'Do not omit the existing code in output. Your generated code will be used as a part of the user\'s code directly.'
+  'Do not omit the existing code in output. Your generated code will be used as a part of the user\'s code directly.',
+  'Keep user request as comment in the code for future reference',
 ];
 
 const EXPORTED_PREVIEW_RULE = 'Exported \`__PREVIEW__\` is previewable component for check without props. If the component has a prop, you should use the prop in __PREVIEW__.'
 const USING_TAILWIND_RULE = 'You can use tailwindcss classes in your code';
 const DO_NOT_USE_TAILWIND_RULE = 'You should not use tailwindcss classes in your code';
 
-const OUTPUT_EXAMPLE = `## Output Example
-
-\`\`\`tsx
-export default function Text(props: { text: string }) {
-  return <span>{props.text}</span>
-}
-
-export function __PREVIEW__() {
-  return <Text text={text} />
-}
-\`\`\`
-`;
+const GENERATE_PREVIEW_RULE = 'Generate __PREVIEW__ component without props if file main component has props.'
+const GENERATE_IN_SOURCE_TEST_RULE = 'Generate in-source test if user request does not have test code.'
 
 type MarkupperOptions = {
+  filename: string,
   tailwind: boolean,
   library: string // 'react' | 'vue' | 'svelte',
 }
@@ -35,10 +32,20 @@ type MarkupperOptions = {
 const GENERATE_INTO = (library: string) => `Please generate a new component of ${library} by user request.`;
 const FIX_INTRO = 'Please fix code for user request.';
 
-function buildSystemPrompt(intro: string, options: MarkupperOptions) {
+function buildSystemPrompt(intro: string, options: MarkupperOptions, flags: ComponentFlag[]) {
   const rules = [...RULES, EXPORTED_PREVIEW_RULE];
   if (options.tailwind) {
     rules.push(USING_TAILWIND_RULE);
+  } else {
+    rules.push(DO_NOT_USE_TAILWIND_RULE);
+  }
+
+  if (flags.includes('preview-component')) {
+    rules.push(GENERATE_PREVIEW_RULE);
+  }
+
+  if (flags.includes('in-source-test')) {
+    rules.push(GENERATE_IN_SOURCE_TEST_RULE);
   }
   return `${SHARED_INTRO}
 ${intro}
@@ -47,25 +54,25 @@ ${intro}
 
 ${rules.map(s => `- ${s}`).join('\n')}
 
-${OUTPUT_EXAMPLE}
+## Output Example
+
+${buildOutputExample(options, flags)}
 `;
 }
 
-export function buildMarkupper(options: MarkupperOptions) {
+export function buildMarkupper(options: MarkupperOptions, flags: ComponentFlag[]) {
   return {
     fix(opts: {
       code: string,
       request: string,
-      test?: string,
-      errorText?: string,
       imageUrl?: string,
     }): ChatMessage[] {
-      const { code, test, request, imageUrl } = opts;
-      const fixingContent = buildFixRequest(code, request, test, opts.errorText);
+      const { code, request, imageUrl } = opts;
+      const fixingContent = buildFixRequest(code, request);
       return [
         {
           role: 'system',
-          content: buildSystemPrompt(FIX_INTRO, options),
+          content: buildSystemPrompt(FIX_INTRO, options, flags),
         },
         {
           role: 'user',
@@ -73,33 +80,7 @@ export function buildMarkupper(options: MarkupperOptions) {
         },
       ]
     },
-    fixWithTest(opts: {
-      code: string,
-      request: string,
-      errorText: string,
-      testCmd: string[],
-      test?: string,
-      lastPrompt?: string,
-      imageUrl?: string,
-    }) {
-      const retryContent = buildRetryRequest(
-        opts.code,
-        opts.request,
-        opts.test,
-        opts.testCmd,
-        opts.errorText,
-      );
-      return [{
-        role: 'system',
-        content: buildSystemPrompt(FIX_INTRO, options),
-      },
-      {
-        role: 'user',
-        content: opts.imageUrl ? withImage(retryContent, opts.imageUrl) : retryContent,
-      }]
-      // return messages;
-    },
-    generate(opts: {
+    new(opts: {
       filename: string,
       request: string,
     }): ChatMessage[] {
@@ -108,18 +89,21 @@ export function buildMarkupper(options: MarkupperOptions) {
       return [
         {
           role: 'system',
-          content: buildSystemPrompt(GENERATE_INTO(options.library), options),
+          content: buildSystemPrompt(GENERATE_INTO(options.library), options, flags),
         },
         {
           role: 'user',
           content: [
             {
               type: "text",
-              text: `## Request
+              text: dedent(`## Request
 
 ${request}
 
-Please write a new code for ${filename}!`,
+---
+
+Please write a new code for ${filename}.`,
+              )
             }
           ]
         }]
@@ -130,64 +114,18 @@ Please write a new code for ${filename}!`,
 function buildFixRequest(
   code: string,
   request: string,
-  test?: string,
-  errorText?: string
 ) {
-  let result = `## Code
+  let result = `## Code\n\n`;
 
-\`\`\`tsx
+  result += `\`\`\`tsx
 ${code}
-\`\`\`
-
-${test ? `## Test\n\n${test}\n` : ''}
-
-## Request
+\`\`\`\n`;
+  result += `## Request
 
 ${request}
 `;
-  if (errorText) {
-    result += `## Failed Reason
-
-${errorText}
-
-You should modify the code to pass the test.
-`;
-  } else {
-    result += "Let's fix the code!"
-      ;
-  }
+  result += `---\n\nLet's fix given code.`;
   return result;
-}
-
-function buildRetryRequest(
-  code: string,
-  request: string,
-  test: string | undefined,
-  testCmd: string[],
-  failReason: string,
-) {
-  return `## Code (Test Failed)
-
-\`\`\`tsx
-${code}
-\`\`\`
-
-${test ? `## Test\n\n${test}\n` : ''}
-
-## Request
-
-${request}
-
-## Failed Reason
-
-test command: ${testCmd.join(" ")}
-
-${failReason}
-
-You should modify the code to pass the test.
-
-Let's try again!
-`;
 }
 
 // consider image request
@@ -205,3 +143,73 @@ function withImage(message: string, b64image: string): Array<ChatContent> {
     },
   ]
 }
+
+function buildOutputExample(options: MarkupperOptions, flags: ComponentFlag[]) {
+  const hasPreviewComponent = flags.includes('preview-component');
+  const exportProps = hasPreviewComponent ? 'props: { text: string }' : '';
+  const jsxText = hasPreviewComponent ? '{props.text}' : 'Hello';
+
+  const componentName = getExportSymbolForFilepath(options.filename, true);
+
+  let style;
+  if (options.tailwind) {
+    style = 'className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"';
+  } else {
+    style = 'style={{ color: "white", backgroundColor: "indigo", borderRadius: "4px"}}';
+  }
+
+  let code = '';
+  code += '```tsx\n';
+
+  code += dedent(`
+  // Generated Prompts:
+  // - Create a button component that accepts an \`onClick\` prop and renders a button with the text "Click me".
+  // - Add a preview component that renders the button with an \`onClick\` prop.
+  \n`);
+
+  code += `\n`;
+
+  if (flags.includes('export-default')) {
+    code += dedent(`
+      export default function ${componentName}(${exportProps}) {
+        return <span>${jsxText}</span>
+      }\n`
+    );
+  } else {
+    code += dedent(`
+    export function ${componentName}(${exportProps}) {
+      return <button
+        type="button"
+        ${style}
+      >
+        ${jsxText}
+      </button>
+    }\n`);
+  }
+  code += `\n`;
+  if (flags.includes('preview-component')) {
+    code += dedent(`
+    export function __PREVIEW__() {
+      return <${componentName} onClick={() => {}} />
+    }\n`);
+  }
+  code += `\n`;
+
+  if (flags.includes('in-source-test')) {
+    code += dedent(`
+    /**
+     * @vitest-environment jsdom
+     */
+    if (import.meta.vitest) {
+      const { test, expect } = import.meta.vitest;
+      const { render, screen } = await import("@testing-library/react");
+      test("${componentName}", () => {
+        render(<${componentName} onClick={() => { }} />);
+      });
+    }\n`);
+  }
+
+  code += '\n```';
+  return code;
+}
+

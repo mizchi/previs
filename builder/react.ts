@@ -1,5 +1,5 @@
 import { relative } from "../deps.ts";
-import { getExportedComponent } from "../utils.ts";
+import { getExportedSymbol } from "../utils.ts";
 
 const ENTRY_FILE_NAME = "entry.preview.tsx";
 
@@ -11,7 +11,7 @@ type CreateReactProjectOptions = {
 
 export function buildReactProjectFiles({ imports, previewDir, filename }: CreateReactProjectOptions) {
   const relativeImports = imports.map(s => relative(previewDir, s));
-  const exportedName = getExportedComponent(filename);
+  const exportedName = getExportedSymbol(filename);
   return {
     'index.html': buildVirtualIndexHtml(),
     'entry.preview.tsx': buildReactEntry(exportedName, relativeImports),

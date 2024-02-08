@@ -2,12 +2,14 @@ import { ChatMessage } from './types.ts';
 import { requestCode } from "./request.ts";
 import { buildMarkupper } from "./markupper.ts";
 import { buildCoder } from "./coder.ts";
+import { ComponentFlag } from "./types.ts";
 
 export type NewOptions = {
   target: string;
   request: string;
   debug?: boolean;
   model?: string;
+  printPrompt?: boolean;
 }
 
 export interface FixOptions extends NewOptions {
@@ -22,11 +24,12 @@ export type ViewContext = {
   getImage: () => Promise<string>;
 }
 
-export async function getFixedComponent(options: FixOptions & ViewContext): Promise<string> {
+export async function getFixedComponent(options: FixOptions & ViewContext, flags: ComponentFlag[]): Promise<string> {
   const markupper = buildMarkupper({
     tailwind: options.tailwind,
-    library: options.library
-  });
+    library: options.library,
+    filename: options.target,
+  }, flags);
   const test = undefined;
   const b64image = options.vision ? await options.getImage() : undefined;
   const messages = markupper.fix({
@@ -41,24 +44,28 @@ export async function getFixedComponent(options: FixOptions & ViewContext): Prom
     model: options.model,
     debug: options.debug,
     messages: messages as ChatMessage[],
+    printPrompt: options.printPrompt,
     expectedSize: Array.from(options.code).length
   });
 }
 
-export async function getNewComponent(options: NewOptions & ViewContext): Promise<string> {
+export async function getNewComponent(options: NewOptions & ViewContext, flags: ComponentFlag[]): Promise<string> {
   const markupper = buildMarkupper({
     tailwind: options.tailwind,
-    library: options.library
-  });
+    library: options.library,
+    filename: options.target,
+  }, flags);
 
-  const messages = markupper.generate({
+  const messages = markupper.new({
     filename: options.target,
     request: options.request,
   });
+
   const newCode = await requestCode({
     model: options.model,
     vision: options.vision,
     debug: options.debug,
+    printPrompt: options.printPrompt,
     messages: messages as ChatMessage[],
   });
   return newCode;
@@ -74,6 +81,7 @@ export async function getNewCode(options: NewOptions): Promise<string> {
   const newCode = await requestCode({
     model: options.model,
     debug: options.debug,
+    printPrompt: options.printPrompt,
     messages: messages as ChatMessage[],
   });
   return newCode;
@@ -89,7 +97,9 @@ export async function getFixedCode(options: FixOptions): Promise<string> {
   return await requestCode({
     model: options.model,
     debug: options.debug,
+    printPrompt: options.printPrompt,
     messages: messages as ChatMessage[],
     expectedSize: Array.from(options.code).length
   });
 }
+

@@ -16,6 +16,12 @@ const argsOptions = {
     type: "boolean",
     short: "h",
   },
+  printPrompt: {
+    type: "boolean",
+  },
+  noAutoload: {
+    type: 'boolean',
+  },
   model: {
     type: "string",
     short: "m",

@@ -1,14 +1,22 @@
 import { readFile } from "node:fs/promises";
-import { join, $ } from "../deps.ts";
+import { join, $, exists } from "../deps.ts";
 import { startBuilder } from "../mod.ts";
 import { startBrowser } from "../screenshot/mod.ts";
 import { pxToNumber } from "../utils.ts";
 import { CLIOptions } from "./options.ts";
+import { ProjectContext } from "./context.ts";
 
 const defaultPort = "3434";
 
-export async function startPresenter(target: string, options: CLIOptions) {
-  const imports = options.import?.map(s => join(Deno.cwd(), s)) ?? []
+export async function startPresenter(target: string, options: CLIOptions, ctx: ProjectContext) {
+  const imports = options.import?.map(s => join(Deno.cwd(), s)) ?? [];
+  if (!options.noAutoload) {
+    const autoImportStylePath = join(ctx.base, 'src/index.css');
+    if (await exists(autoImportStylePath) && !imports.includes(autoImportStylePath)) {
+      console.log('[previs:presenter] autoload src/index.css');
+      imports.push(autoImportStylePath);
+    }
+  }
 
   const builder = await startBuilder({
     cwd: Deno.cwd(),

@@ -52,7 +52,11 @@ export async function* streamOpenAI(options: RequestOpenAIOptions): AsyncGenerat
         const trimData = data.trim();
         if (trimData === "") return undefined;
         if (trimData === "[DONE]") return undefined;
-        return JSON.parse(data.trim());
+        try {
+          return JSON.parse(data.trim());
+        } catch (e) {
+          console.log(e, data);
+        }
       })
       .filter((data) => data);
     for (const message of response ?? []) {

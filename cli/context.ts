@@ -13,7 +13,7 @@ export type ProjectContext = {
   tailwind?: Found;
   useTailwind: boolean;
   libraryMode: LibraryMode;
-  getInput: (message: string) => string | undefined,
+  getInput: (message: string, defaults?: string) => string | undefined,
   getConfirm: (message: string) => boolean,
   // isReactJsx: boolean;
 }
@@ -96,12 +96,12 @@ export async function getTargetContext(filepath: string): Promise<LibraryMode | 
   }
 }
 
-function getInput(message: string): string | undefined {
+function getInput(message: string, defaults?: string): string | undefined {
   const handler = () => {
     // ignore
   };
   Deno.addSignalListener('SIGINT', handler);
-  const ret = prompt(message);
+  const ret = prompt(message, defaults);
   Deno.removeSignalListener('SIGINT', handler);
   if (ret === null) return undefined;
   return ret;

@@ -14,3 +14,5 @@ export type ChatMessage = {
   | string
   | ChatContent[]
 };
+
+export type ComponentFlag = 'tailwind' | 'in-source-test' | 'export-default' | 'preview-component';

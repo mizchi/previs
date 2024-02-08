@@ -1,4 +1,4 @@
-import { dirname, exists, join } from "../deps.ts";
+import { dirname, exists, expandGlob, join } from "../deps.ts";
 
 export async function cleanup(dir: string, options: { debug?: boolean } = {}) {
   for await (const entry of Deno.readDir(dir)) {
@@ -9,14 +9,12 @@ export async function cleanup(dir: string, options: { debug?: boolean } = {}) {
         console.log("[previs:clean]", entry.name + '/*');
       }
     }
-    // remove or rollback
-    if (entry.isFile && entry.name.includes(".__previs__.")) {
-      const backupPath = join(dir, entry.name);
-      if (options.debug) {
-        console.log("[previs:clean]", backupPath);
-      }
+    for await (const entry of expandGlob("./**/*.__previs__.*", {
+      root: dir,
+      exclude: ["node_modules", ".git", '.cache', ''],
+    })) {
+      await Deno.remove(entry.path, { recursive: true, }).catch(() => { });
     }
-    // TODO: glob
   }
 }
 
