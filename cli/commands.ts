@@ -1,12 +1,17 @@
 import { startBuilder } from "../builder/mod.ts";
 import { join, $, exists, basename } from "../deps.ts";
-import { getFixedComponent, getFixedCode, getNewComponent, getNewCode, FixOptions } from "../fixer/mod.ts";
+// import { getFixedComponent, getFixedCode, getNewComponent, getNewCode, FixOptions } from "../fixer/mod.ts";
 import { CLIOptions, getHelpText } from "./options.ts";
-import { formatFilepath, getTempFilepath, isPreviewableCode, pxToNumber } from "../utils.ts";
+import { formatFilepath, getTempFilepath, isPreviewableCode, pick, pxToNumber } from "../utils.ts";
 import { ProjectContext, getProjectContext, getTargetContext } from "./context.ts";
 import { startPresenter } from "./presenter.ts";
 import { multiSelect, nodePackageInstalled } from "./cli_utils.ts";
-import { ComponentFlag } from "../fixer/types.ts";
+import { ChatMessage } from "../fixer/types.ts";
+import { createFixAction, createNewAction } from "../fixer/markupper.ts";
+import { MarkupContext } from "../fixer/markupper.ts";
+import { MarkupFlag } from "../fixer/markupper.ts";
+import { requestCode } from "../fixer/request.ts";
+import { FixOptions, getFixedCode, getNewCode } from "../fixer/mod.ts";
 
 const defaultPort = "3434";
 const DEFAULT_MAX_TEST_RETRIES = 3;
@@ -28,9 +33,7 @@ export async function screenshot(options: CLIOptions, ctx: ProjectContext) {
 export async function fix(options: CLIOptions, ctx: ProjectContext) {
   const originalTarget = options.target!;
   const uiMode = !originalTarget.endsWith(".ts");
-  const vision = !!options.vision && uiMode;
   const tempTarget = getTempFilepath(originalTarget);
-  const tailwind = ctx.useTailwind;
   const library = await getTargetContext(originalTarget) ?? ctx.libraryMode;
   const auto = options.auto;
 
@@ -40,9 +43,14 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
   }
   let currentCode = "";
   let currentRequest: string | undefined = options.request;
-  // let errorText: string | undefined = undefined;
   let testRetryCount = 0;
   const preExists = await exists(originalTarget);
+
+  const markupContext: MarkupContext = {
+    tailwind: ctx.useTailwind,
+    library,
+    vision: !!options.vision,
+  };
 
   // fix mode
   if (preExists) {
@@ -52,38 +60,31 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
     // generation mode
     const filename = basename(originalTarget);
     const newRequest = currentRequest ?? ctx.getInput("new>", `Create ${filename}`);
-    if (!newRequest) {
-      return;
-    }
+    if (!newRequest) return;
     // consnume
     if (currentRequest) {
       currentRequest = undefined;
     }
     if (uiMode) {
-      const newComponentFlags = await multiSelect('includes...', [
-        { text: "In-Source Testing (Vitest)", selected: !!options.testCmd, value: 'in-source-test' },
-        { text: "Include __Preview__", selected: true, value: 'preview-component' },
-        { text: 'Use tailwind', selected: tailwind, value: 'tailwind' },
-        { text: "export default", selected: false, value: 'export-default' },
-      ]) as ComponentFlag[];
-      currentCode = await getNewComponent({
-        target: originalTarget,
-        request: newRequest!,
-        tailwind,
-        library: library,
-        debug: options.debug,
-        model: options.model,
-        printPrompt: !!options.printPrompt,
-        vision,
-        getImage: () => ui?.getBase64Image()!,
-      }, newComponentFlags);
+      const newAction = createNewAction(markupContext);
+      const flags = newAction.selectors({
+        request: newRequest,
+        filename: originalTarget,
+      });
+      const activeFlags = await multiSelect('includes...', flags);
+      const messages = newAction.build({
+        request: newRequest,
+        filename: originalTarget,
+      }, activeFlags as MarkupFlag[]);
+      currentCode = await requestCode({
+        ...pick(options, ['model', 'debug', 'printPrompt', 'vision']),
+        messages: messages as ChatMessage[],
+      });
     } else {
       currentCode = await getNewCode({
-        model: options.model,
+        ...pick(options, ['model', 'debug', 'printPrompt', 'vision']),
         target: originalTarget,
         request: newRequest!,
-        debug: !!options.debug,
-        printPrompt: !!options.printPrompt,
       });
     }
   }
@@ -153,6 +154,7 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
   // start fixing loop
   while (true) {
     const fixOptions: FixOptions = {
+      ...pick(options, ['model', 'debug', 'printPrompt', 'vision']),
       code: currentCode,
       target: originalTarget,
       model: options.model,
@@ -160,14 +162,19 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
       debug: !!options.debug,
       printPrompt: !!options.printPrompt,
     };
+    const fixAction = createFixAction(markupContext);
+    // TODO: selector
+
     currentCode = uiMode
-      ? await getFixedComponent({
+      ? await requestCode({
         ...fixOptions,
-        vision,
-        library,
-        tailwind,
-        getImage: () => ui!.getBase64Image(),
-      }, ['preview-component'])
+        // TODO: image
+        messages: fixAction.build({
+          code: currentCode,
+          request: request!,
+          filename: originalTarget,
+        }, ['preview-component']) as ChatMessage[],
+      })
       : await getFixedCode(fixOptions);
     // save and screenshot
     await Deno.writeTextFile(tempTarget, currentCode);
@@ -213,7 +220,6 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
       await Deno.remove(tempTarget);
       break;
     }
-    // currentCode = newCode;
   }
 }
 
@@ -282,25 +288,9 @@ export async function doctor(_options: CLIOptions) {
     console.log("❌ package.json", "Put package.json in the root of the project");
   }
 
-  // if (nodeModulesDir) {
-  //   console.log("✅ node_modules:", formatFilepath(nodeModulesDir.found));
-  // } else {
-  //   console.log("❌ node_modules:", "Install node_modules");
-  // }
-
-  // if (vscodeDir) {
-  //   console.log("✅ vscode settings:", formatFilepath(vscodeDir.found), '');
-  // }
-
   if (context.tsconfig) {
     console.log("✅ tsconfig.json:", formatFilepath(context.base, context.tsconfig.path));
   }
-
-  // if (isReactJsx) {
-  //   console.log("✅ compilerOptions.jsx: react-jsx");
-  // } else {
-  //   console.log("❌ compilerOptions.jsx is not react-jsx");
-  // }
 
   if (context.libraryMode) {
     console.log("Library:", context.libraryMode);
