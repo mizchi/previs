@@ -16,6 +16,8 @@ export type RequestOpenAIOptions = {
 
 export async function* streamOpenAI(options: RequestOpenAIOptions): AsyncGenerator<string, void, void> {
   const max_tokens = options.model === 'gpt-4-vision-preview' ? 4096 : null;
+
+  // console.log('model', options.model, 'max_tokens:', max_tokens);
   const completion = await fetch("https://api.openai.com/v1/chat/completions", {
     signal: options.signal,
     headers: {

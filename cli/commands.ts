@@ -164,16 +164,16 @@ export async function fix(options: CLIOptions, ctx: ProjectContext) {
     };
     const fixAction = createFixAction(markupContext);
     // TODO: selector
-
     currentCode = uiMode
       ? await requestCode({
         ...fixOptions,
-        // TODO: image
         messages: fixAction.build({
           code: currentCode,
           request: request!,
           filename: originalTarget,
         }, ['preview-component']) as ChatMessage[],
+        expectedSize: currentCode.length,
+        base64image: options.vision ? await ui?.getBase64Image() : undefined,
       })
       : await getFixedCode(fixOptions);
     // save and screenshot

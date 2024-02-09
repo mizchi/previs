@@ -4,7 +4,6 @@ import { PromptAction, buildTemplateToAction, NewInput, FixInput } from "./promp
 export type MarkupFlag = 'tailwind' | 'in-source-test' | 'export-default' | 'preview-component';
 
 const flags = ['tailwind', 'in-source-test', 'export-default', 'preview-component'] as MarkupFlag[];
-// export type MarkupFlag = (typeof flags)[number];
 
 export type MarkupContext = {
   tailwind: boolean,

@@ -12,25 +12,20 @@ type RequestCodeOptions = {
   debug?: boolean,
   expectedSize?: number,
   printPrompt?: boolean,
+  base64image?: string,
 }
 
 const GPT_4_VISION_MODEL = 'gpt-4-vision-preview';
 const GPT_4_TURBO_PREVIEW_MODEL = 'gpt-4-turbo-preview';
 // const GPT_4_PREVIEW_MODEL = 'gpt-4-1106-preview';
 
-export function inferModel(options: {
-  messages: ChatMessage[],
-  vision?: boolean,
-}) {
-  if (options.vision) return GPT_4_VISION_MODEL;
-  const hasImage = options.messages.some(m => Array.isArray(m.content));
-  if (hasImage) return GPT_4_VISION_MODEL;
-  return GPT_4_TURBO_PREVIEW_MODEL;
-}
-
 export async function requestCode(options: RequestCodeOptions) {
   const apiKey = options.apiKey ?? getApiKey();
-  const model = options.model ?? inferModel({ messages: options.messages, vision: options.vision });
+
+  if (options.base64image) {
+    options.messages = attachImage(options.messages, options.base64image);
+  }
+  const model = options.model ?? options.base64image ? GPT_4_VISION_MODEL : GPT_4_TURBO_PREVIEW_MODEL
   if (options.printPrompt) {
     console.log("model:", model);
     printPrompt(options.messages);
@@ -66,6 +61,19 @@ export async function requestCode(options: RequestCodeOptions) {
   // TODO: validate
   return extractCodeBlock(raw);
 }
+
+// Add image to last messages
+function attachImage(messages: ChatMessage[], base64image: string) {
+  const lastMessage = messages[messages.length - 1];
+  if (typeof lastMessage.content === 'string') {
+    lastMessage.content = [
+      { type: 'image', image_url: { url: `data:image/jpeg;base64,${base64image}` } },
+      { type: 'text', text: lastMessage.content },
+    ];
+  }
+  return messages;
+}
+
 
 function getApiKey() {
   const apiKey = Deno.env.get('OPENAI_API_KEY') ?? Deno.env.get('PREVIS_OPENAI_API_KEY');
