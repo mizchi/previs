@@ -1,0 +1,1 @@
+export { read, write } from "./impl.ts";

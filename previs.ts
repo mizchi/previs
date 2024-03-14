@@ -9,6 +9,7 @@ try {
   const options = buildOptions(base, Deno.args);
   await cleanup(ctx.base);
   const cmd = commands[options.command];
+  console.log("run subcommand", options.command);
   if (cmd) {
     await cmd(options, ctx);
   } else {

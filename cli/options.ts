@@ -9,6 +9,7 @@ const CMDS = [
   "ss",
   "fix",
   "serve",
+  "dts"
 ];
 
 const argsOptions = {
@@ -86,30 +87,6 @@ Examples:
   $ previs button.tsx # start fix existed file
   $ previs button.tsx -i index.css # load with css
 `;
-
-// function getParsedArgs(args: string[]) {
-//   const splitIndex = args.indexOf("--");
-//   if (splitIndex === -1) {
-//     const parsed = parseArgs({
-//       args: args,
-//       options: argsOptions,
-//       allowPositionals: true,
-//     });
-//     return {
-//       ...parsed,
-//       testCommand: undefined,
-//     }
-//   } else {
-//     return {
-//       ...parseArgs({
-//         args: args.slice(0, splitIndex),
-//         options: argsOptions,
-//         allowPositionals: true,
-//       }),
-//       testCommand: args.slice(splitIndex + 1),
-//     };
-//   }
-// }
 
 export function getHelpText() {
   let help = HELP_INTRO + '\n';

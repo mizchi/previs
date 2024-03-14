@@ -12,6 +12,7 @@ import { MarkupContext } from "../fixer/markupper.ts";
 import { MarkupFlag } from "../fixer/markupper.ts";
 import { requestCode } from "../fixer/request.ts";
 import { FixOptions, getFixedCode, getNewCode } from "../fixer/mod.ts";
+import { getBundledDtsForFile } from "../extracter/mod.ts";
 
 const defaultPort = "3434";
 const DEFAULT_MAX_TEST_RETRIES = 3;
@@ -258,6 +259,13 @@ export async function help(_options: CLIOptions, _ctx: ProjectContext) {
   const helpText = getHelpText();
   console.log(helpText);
 }
+
+export async function dts(_options: CLIOptions, _ctx: ProjectContext) {
+  const target = _options.target!;
+  const dtsCode = await getBundledDtsForFile(target);
+  console.log(dtsCode);
+}
+
 
 export async function doctor(_options: CLIOptions) {
   await checkInstalled('git', 'Please install git');

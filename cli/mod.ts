@@ -1,4 +1,4 @@
-import { fix, init, screenshot, test, serve, doctor, help } from "./commands.ts";
+import { fix, init, screenshot, test, serve, doctor, help, dts } from "./commands.ts";
 import { type ProjectContext } from "./context.ts";
 import { type CLIOptions } from "./options.ts";
 
@@ -10,6 +10,7 @@ export const commands: Record<string, (options: CLIOptions, ctx: ProjectContext)
   test,
   serve,
   doctor,
+  dts,
 };
 
 export { cleanup } from "./file_utils.ts";
